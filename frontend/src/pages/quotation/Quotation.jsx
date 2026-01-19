@@ -60,26 +60,67 @@ export default function Quotation() {
   /* ================= TOTAL CALCULATION ================= */
 
   useEffect(() => {
-    let sub = 0;
-    quotation.products.forEach((p) => {
-      sub += p.qty * p.price;
-    });
+    let sub = quotation.products.reduce((sum, p) => sum + p.qty * p.price, 0);
 
     let chargesTotal = 0;
+    let totalTax = 0;
+
     quotation.charges.forEach((c) => {
-      chargesTotal += Number(c.amount || 0);
+      chargesTotal += c.amount;
+
+      if (c.taxRate > 0) {
+        totalTax += (c.amount * c.taxRate) / 100;
+      }
     });
 
-    let total = sub + chargesTotal - Number(quotation.extraDiscount || 0);
+    let total =
+      sub + chargesTotal + totalTax - Number(quotation.extraDiscount || 0);
 
     setQuotation((q) => ({
       ...q,
       totals: {
         subTotal: sub,
-        grandTotal: total < 0 ? 0 : total,
+        tax: totalTax,
+        grandTotal: total < 0 ? 0 : Math.round(total),
       },
     }));
   }, [quotation.products, quotation.charges, quotation.extraDiscount]);
+
+  const [textSheet, setTextSheet] = useState({
+    open: false,
+    field: null, // "notes" | "reference" | "terms"
+    value: "",
+  });
+
+  const [toast, setToast] = useState({
+    open: false,
+    message: "",
+  });
+
+  const showToast = (message) => {
+    setToast({ open: true, message });
+
+    setTimeout(() => {
+      setToast({ open: false, message: "" });
+    }, 2500);
+  };
+
+  const openTextSheet = (field) => {
+    setTextSheet({
+      open: true,
+      field,
+      value: quotation[field] || "",
+    });
+  };
+
+  const saveTextSheet = () => {
+    setQuotation({
+      ...quotation,
+      [textSheet.field]: textSheet.value,
+    });
+
+    setTextSheet({ open: false, field: null, value: "" });
+  };
 
   /* ================= CREATE ================= */
 
@@ -89,8 +130,126 @@ export default function Quotation() {
       return;
     }
 
-    await API.post("/quotations", quotation);
-    setActivePicker("preview");
+    // 🔑 MAP FRONTEND STATE → BACKEND SCHEMA
+    const payload = {
+      customer: quotation.customer._id,
+
+      items: quotation.products.map((p) => ({
+        productId: p._id,
+        name: p.name,
+        hsn: p.hsn,
+        unit: p.unit,
+        quantity: p.qty,
+        price: p.price,
+        taxRate: p.taxRate || 0,
+        total: p.qty * p.price,
+      })),
+
+      discount: Number(quotation.extraDiscount || 0),
+
+      extraCharges: quotation.charges.map((c) => ({
+        label: c.label,
+        amount: Number(c.amount),
+        taxRate: Number(c.taxRate || 0),
+      })),
+
+      dispatchAddress: quotation.dispatchAddress,
+      shippingAddress: quotation.shippingAddress,
+
+      bank: quotation.bank?._id || null,
+      signature: quotation.signature?._id || null,
+
+      reference: quotation.reference,
+      notes: quotation.notes,
+      terms: quotation.terms,
+
+      attachments: quotation.attachments.map((a) => a.name),
+    };
+
+    try {
+      await API.post("/quotations", payload);
+      setActivePicker("preview");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save quotation");
+    }
+  };
+
+  const requireProducts = () => {
+    if (quotation.products.length === 0) {
+      showToast("Please add products first");
+      return false;
+    }
+    return true;
+  };
+
+  const [chargeSheet, setChargeSheet] = useState({
+    open: false,
+    type: null, // "discount" | "delivery" | "packaging"
+    mode: "amount", // "amount" | "percent"
+    value: "",
+    taxRate: 0,
+    taxType: "without", // "with" | "without"
+  });
+
+  const openDiscountSheet = () => {
+    setChargeSheet({
+      open: true,
+      type: "discount",
+      mode: "amount",
+      value: quotation.extraDiscount || "",
+      taxRate: 0,
+      taxType: "without",
+    });
+  };
+
+  const openChargeSheet = (type) => {
+    setChargeSheet({
+      open: true,
+      type, // delivery | packaging
+      mode: "amount",
+      value: "",
+      taxRate: 5,
+      taxType: "without",
+    });
+  };
+
+  const saveDiscount = () => {
+    let discount = Number(chargeSheet.value || 0);
+
+    if (chargeSheet.mode === "percent") {
+      discount = (quotation.totals.subTotal * discount) / 100;
+    }
+
+    setQuotation({
+      ...quotation,
+      extraDiscount: discount,
+    });
+
+    setChargeSheet({ open: false });
+  };
+
+  const saveCharge = () => {
+    const amount = Number(chargeSheet.value || 0);
+
+    setQuotation({
+      ...quotation,
+      charges: [
+        ...quotation.charges.filter((c) => c.type !== chargeSheet.type),
+        {
+          type: chargeSheet.type, // delivery | packaging
+          label:
+            chargeSheet.type === "delivery"
+              ? "Delivery/Shipping Charges"
+              : "Packaging Charges",
+          amount,
+          taxRate: chargeSheet.taxRate,
+          taxType: chargeSheet.taxType,
+        },
+      ],
+    });
+
+    setChargeSheet({ open: false });
   };
 
   /* =====================================================
@@ -207,132 +366,419 @@ export default function Quotation() {
 
       {/* CUSTOMER */}
       <Section title="Customer">
-        <Row
-          label={
-            quotation.customer ? quotation.customer.name : "Select Customer"
-          }
-          action="Change"
-          onClick={() => setActivePicker("customer")}
-        />
+        {!quotation.customer ? (
+          <div
+            style={styles.selectCard}
+            onClick={() => setActivePicker("customer")}
+          >
+            <span style={styles.plus}>＋</span>
+            <span style={styles.selectText}>Select Customer</span>
+          </div>
+        ) : (
+          <div style={styles.card}>
+            <span style={styles.cardTitle}>{quotation.customer.name}</span>
+            <div style={styles.cardActions}>
+              <span style={styles.link}>View</span>
+              <span
+                style={styles.link}
+                onClick={() => setActivePicker("customer")}
+              >
+                Change
+              </span>
+            </div>
+          </div>
+        )}
       </Section>
 
       {/* PRODUCTS */}
       <Section title="Products">
         {quotation.products.length === 0 ? (
-          <Row
-            label="Select Products"
-            action="Add"
+          <div
+            style={styles.selectCard}
             onClick={() => setActivePicker("product")}
-          />
+          >
+            <span style={styles.plus}>＋</span>
+            <span style={styles.selectText}>Select Products</span>
+          </div>
         ) : (
-          quotation.products.map((p, i) => (
-            <div key={i} style={styles.itemRow}>
-              <span>
-                {p.name} × {p.qty}
+          <>
+            <div style={styles.editHeader}>
+              <span />
+              <span
+                style={styles.editBtn}
+                onClick={() => setActivePicker("product")}
+              >
+                🖍 Add / Edit
               </span>
-              <strong>₹ {p.qty * p.price}</strong>
             </div>
-          ))
+
+            {quotation.products.map((p, i) => (
+              <div key={i} style={styles.productCard}>
+                <div>
+                  <strong>{p.name}</strong>
+                  <div style={styles.muted}>
+                    × {p.qty} {p.unit || ""}
+                  </div>
+                </div>
+                <strong>₹ {p.qty * p.price}</strong>
+              </div>
+            ))}
+
+            <div
+              style={styles.addMoreBtn}
+              onClick={() => setActivePicker("product")}
+            >
+              ＋ Add More Items
+            </div>
+          </>
         )}
-        <Row
-          label="Add / Edit Products"
-          action="Edit"
-          onClick={() => setActivePicker("product")}
+      </Section>
+
+      {/* OPTIONAL */}
+      <div style={styles.optionalHeader}>
+        <span>Optional</span>
+        <span style={styles.addChargeBtn}>＋ Additional Charges</span>
+      </div>
+
+      <div style={styles.optionalCard}>
+        {/* DISPATCH */}
+        <OptionalRow
+          icon="🚚"
+          label="Dispatch Address"
+          value={quotation.dispatchAddress}
+          action={quotation.dispatchAddress ? "Change" : null}
         />
-      </Section>
 
-      {/* ADDRESSES */}
-      <Section title="Dispatch Address">
-        <Row label="Select Dispatch Address" action="Add" />
-      </Section>
+        {/* SHIPPING */}
+        <OptionalRow
+          icon="📍"
+          label="Shipping Address"
+          value={quotation.shippingAddress}
+          action={quotation.shippingAddress ? "Change" : null}
+        />
 
-      <Section title="Shipping Address">
-        <Row label="Select Shipping Address" action="Add" />
-      </Section>
-
-      {/* BANK */}
-      <Section title="Bank">
-        <Row
-          label={
-            quotation.bank?.type === "CASH"
-              ? "Cash"
-              : quotation.bank?.bankName || "Select Bank"
+        {/* BANK */}
+        <OptionalRow
+          icon="🏦"
+          label="Bank"
+          value={
+            quotation.bank?.type === "CASH" ? "Cash" : quotation.bank?.bankName
           }
-          action="Change"
+          action={quotation.bank ? "Change" : null}
           onClick={() => setActivePicker("bank")}
         />
-      </Section>
 
-      {/* SIGNATURE */}
-      <Section title="Signature">
-        <Row
-          label={
-            quotation.signature === "NONE"
-              ? "None"
-              : quotation.signature?.name || "Select Signature"
-          }
-          action="Change"
+        {/* SIGNATURE */}
+        <OptionalRow
+          icon="✍️"
+          label="Signature"
+          value={quotation.signature?.name}
+          action={quotation.signature ? "Change" : null}
           onClick={() => setActivePicker("signature")}
         />
-      </Section>
 
-      {/* OPTIONAL TEXT */}
-      <Section title="Reference">
-        <Row
-          label={quotation.reference || "Add Reference"}
-          action="Edit"
-          onClick={() => {
-            const v = prompt("Reference", quotation.reference);
-            if (v !== null) setQuotation({ ...quotation, reference: v });
-          }}
-        />
-      </Section>
+        <Divider />
 
-      <Section title="Notes">
-        <Row
-          label={quotation.notes || "Add Notes"}
-          action="Edit"
-          onClick={() => {
-            const v = prompt("Notes", quotation.notes);
-            if (v !== null) setQuotation({ ...quotation, notes: v });
-          }}
+        {/* TEXT */}
+        <OptionalRow
+          icon="📘"
+          label="Reference"
+          value={quotation.reference}
+          action={quotation.reference ? "Edit" : null}
+          onClick={() => openTextSheet("reference")}
         />
-      </Section>
 
-      <Section title="Terms & Conditions">
-        <Row
-          label={quotation.terms || "Add Terms"}
-          action="Edit"
-          onClick={() => {
-            const v = prompt("Terms", quotation.terms);
-            if (v !== null) setQuotation({ ...quotation, terms: v });
-          }}
+        <OptionalRow
+          icon="📝"
+          label="Notes"
+          value={quotation.notes}
+          action={quotation.notes ? "Edit" : null}
+          onClick={() => openTextSheet("notes")}
         />
-      </Section>
 
-      {/* ATTACHMENTS */}
-      <Section title="Attachments">
-        <Row
-          label={
-            quotation.attachments.length
-              ? `${quotation.attachments.length} file(s) added`
-              : "Add Attachments"
-          }
-          action="Add"
-          onClick={() => setActivePicker("attachments")}
+        <OptionalRow
+          icon="📜"
+          label="Terms & Conditions"
+          value={quotation.terms}
+          action={quotation.terms ? "Edit" : null}
+          onClick={() => openTextSheet("terms")}
         />
-      </Section>
+
+        <Divider />
+
+        {/* CHARGES */}
+        {/* EXTRA DISCOUNT */}
+        {/* EXTRA DISCOUNT */}
+        {quotation.extraDiscount > 0 ? (
+          <OptionalRow
+            icon="₹"
+            label="Extra Discount"
+            value={`₹${quotation.extraDiscount}`}
+            action="Change"
+            onClick={openDiscountSheet}
+          />
+        ) : (
+          <OptionalRow
+            icon="₹"
+            label="Extra Discount"
+            onClick={() => {
+              if (!requireProducts()) return;
+              openDiscountSheet();
+            }}
+          />
+        )}
+
+        {/* DELIVERY */}
+        {quotation.charges.find((c) => c.type === "delivery") ? (
+          quotation.charges
+            .filter((c) => c.type === "delivery")
+            .map((c, i) => (
+              <OptionalRow
+                key={i}
+                icon="₹"
+                label="Delivery/Shipping Charges (+)"
+                value={`₹${c.amount} + ${c.taxRate}%`}
+                action="Change"
+                onClick={() => openChargeSheet("delivery")}
+              />
+            ))
+        ) : (
+          <OptionalRow
+            icon="₹"
+            label="Delivery/Shipping Charges"
+            onClick={() => {
+              if (!requireProducts()) return;
+              openChargeSheet("delivery");
+            }}
+          />
+        )}
+
+        {/* PACKAGING */}
+        {quotation.charges.find((c) => c.type === "packaging") ? (
+          quotation.charges
+            .filter((c) => c.type === "packaging")
+            .map((c, i) => (
+              <OptionalRow
+                key={i}
+                icon="₹"
+                label="Packaging Charges (+)"
+                value={`₹${c.amount} + ${c.taxRate}%`}
+                action="Change"
+                onClick={() => openChargeSheet("packaging")}
+              />
+            ))
+        ) : (
+          <OptionalRow
+            icon="₹"
+            label="Packaging Charges"
+            onClick={() => {
+              if (!requireProducts()) return;
+              openChargeSheet("packaging");
+            }}
+          />
+        )}
+
+        <Divider />
+
+        {/* ATTACHMENTS */}
+        {quotation.products.length > 0 && (
+          <OptionalRow
+            icon="📎"
+            label="Attachments"
+            value={
+              quotation.attachments.length
+                ? `${quotation.attachments.length} file(s)`
+                : null
+            }
+            action={quotation.attachments.length ? "Change" : "Add"}
+            onClick={() => setActivePicker("attachments")}
+          />
+        )}
+      </div>
 
       {/* TOTAL BAR */}
-      <div style={styles.totalBar}>
-        <div>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Total</div>
-          <strong>₹ {quotation.totals.grandTotal}</strong>
+      {quotation.products.length > 0 && (
+        <div style={styles.totalBar}>
+          <div>
+            {quotation.charges.map((c, i) => (
+              <div key={i} style={styles.totalRow}>
+                <span>
+                  {c.label} ({c.taxRate}%)
+                </span>
+                <span>₹{c.amount}</span>
+              </div>
+            ))}
+
+            <div style={styles.totalRow}>
+              <span>Sub Total</span>
+              <span>₹{quotation.totals.subTotal}</span>
+            </div>
+
+            {quotation.extraDiscount > 0 && (
+              <div style={styles.totalRowGreen}>
+                <span>Discount</span>
+                <span>-₹{quotation.extraDiscount}</span>
+              </div>
+            )}
+
+            {quotation.totals.tax > 0 && (
+              <div style={styles.totalRow}>
+                <span>Total Tax</span>
+                <span>₹{quotation.totals.tax.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+
+          <div style={styles.totalFooter}>
+            <strong>Total Amount</strong>
+            <strong>₹{quotation.totals.grandTotal}</strong>
+
+            <button style={styles.createBtn} onClick={createQuotation}>
+              Create →
+            </button>
+          </div>
         </div>
-        <button style={styles.createBtn} onClick={createQuotation}>
-          Create →
-        </button>
-      </div>
+      )}
+
+      {textSheet.open && (
+        <div style={styles.sheetOverlay}>
+          <div style={styles.sheet}>
+            <div style={styles.sheetHeader}>
+              <strong>
+                {textSheet.field === "notes"
+                  ? "Notes"
+                  : textSheet.field === "reference"
+                  ? "Reference"
+                  : "Terms & Conditions"}
+              </strong>
+
+              <span
+                style={styles.sheetClose}
+                onClick={() =>
+                  setTextSheet({ open: false, field: null, value: "" })
+                }
+              >
+                ✕
+              </span>
+            </div>
+
+            <textarea
+              style={styles.sheetTextarea}
+              placeholder="Add text"
+              value={textSheet.value}
+              onChange={(e) =>
+                setTextSheet({ ...textSheet, value: e.target.value })
+              }
+            />
+
+            <button style={styles.sheetSaveBtn} onClick={saveTextSheet}>
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+      {toast.open && <div style={styles.toast}>{toast.message}</div>}
+      {chargeSheet.open && (
+        <div style={styles.sheetOverlay}>
+          <div style={styles.sheet}>
+            <div style={styles.sheetHeader}>
+              <strong>
+                {chargeSheet.type === "discount"
+                  ? "Add Extra Discount"
+                  : chargeSheet.type === "delivery"
+                  ? "Delivery / Shipping Charges"
+                  : "Packaging Charges"}
+              </strong>
+              <span
+                style={styles.sheetClose}
+                onClick={() => setChargeSheet({ open: false })}
+              >
+                ✕
+              </span>
+            </div>
+
+            {/* ₹ / % TOGGLE */}
+            <div style={styles.toggleRow}>
+              <label>
+                <input
+                  type="radio"
+                  checked={chargeSheet.mode === "amount"}
+                  onChange={() =>
+                    setChargeSheet({ ...chargeSheet, mode: "amount" })
+                  }
+                />{" "}
+                ₹
+              </label>
+
+              <label>
+                <input
+                  type="radio"
+                  checked={chargeSheet.mode === "percent"}
+                  onChange={() =>
+                    setChargeSheet({ ...chargeSheet, mode: "percent" })
+                  }
+                />{" "}
+                %
+              </label>
+            </div>
+
+            {/* INPUT */}
+            <input
+              style={styles.sheetInput}
+              type="number"
+              placeholder="0.0"
+              value={chargeSheet.value}
+              onChange={(e) =>
+                setChargeSheet({ ...chargeSheet, value: e.target.value })
+              }
+            />
+
+            {/* TAX OPTIONS (ONLY FOR CHARGES) */}
+            {chargeSheet.type !== "discount" && (
+              <>
+                <select
+                  style={styles.sheetInput}
+                  value={chargeSheet.taxRate}
+                  onChange={(e) =>
+                    setChargeSheet({
+                      ...chargeSheet,
+                      taxRate: Number(e.target.value),
+                    })
+                  }
+                >
+                  <option value={0}>0%</option>
+                  <option value={5}>5%</option>
+                  <option value={12}>12%</option>
+                  <option value={18}>18%</option>
+                </select>
+
+                <select
+                  style={styles.sheetInput}
+                  value={chargeSheet.taxType}
+                  onChange={(e) =>
+                    setChargeSheet({
+                      ...chargeSheet,
+                      taxType: e.target.value,
+                    })
+                  }
+                >
+                  <option value="without">Without Tax</option>
+                  <option value="with">With Tax</option>
+                </select>
+              </>
+            )}
+
+            <button
+              style={styles.sheetSaveBtn}
+              onClick={
+                chargeSheet.type === "discount" ? saveDiscount : saveCharge
+              }
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -355,6 +801,26 @@ function Row({ label, action, onClick }) {
       {action && <span style={styles.link}>{action}</span>}
     </div>
   );
+}
+
+function OptionalRow({ icon, label, value, onClick, action }) {
+  return (
+    <div style={styles.optionalRow} onClick={onClick}>
+      <div style={styles.optionalLeft}>
+        <span style={styles.optionalIcon}>{icon}</span>
+        <div>
+          <div style={styles.optionalLabel}>{label}</div>
+          <div style={styles.optionalValue}>{value || `Add ${label}`}</div>
+        </div>
+      </div>
+
+      {action && <span style={styles.link}>{action}</span>}
+    </div>
+  );
+}
+
+function Divider() {
+  return <div style={styles.divider} />;
 }
 
 /* ================= STYLES ================= */
@@ -417,5 +883,233 @@ const styles = {
     borderRadius: 10,
     fontSize: 16,
     cursor: "pointer",
+  },
+  selectCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    background: "#2a2a2a",
+    cursor: "pointer",
+  },
+
+  plus: {
+    fontSize: 22,
+    color: "#5b7cfa",
+  },
+
+  selectText: {
+    color: "#5b7cfa",
+    fontSize: 16,
+  },
+
+  card: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: "#2a2a2a",
+    padding: 14,
+    borderRadius: 14,
+  },
+
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 600,
+  },
+
+  cardActions: {
+    display: "flex",
+    gap: 16,
+  },
+
+  editHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+
+  editBtn: {
+    color: "#5b7cfa",
+    cursor: "pointer",
+  },
+
+  productCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    background: "#2a2a2a",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+
+  muted: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+
+  addMoreBtn: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 20,
+    background: "#2a2a2a",
+    textAlign: "center",
+    cursor: "pointer",
+  },
+  optionalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    margin: "16px 12px 8px",
+    opacity: 0.7,
+  },
+
+  addChargeBtn: {
+    color: "#5b7cfa",
+    cursor: "pointer",
+  },
+
+  optionalCard: {
+    background: "#1c1c1c",
+    margin: 12,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+
+  optionalRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "14px 16px",
+    borderBottom: "1px solid #2a2a2a",
+    cursor: "pointer",
+  },
+
+  optionalLeft: {
+    display: "flex",
+    gap: 12,
+    alignItems: "center",
+  },
+
+  optionalIcon: {
+    fontSize: 18,
+    opacity: 0.8,
+  },
+
+  optionalLabel: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+
+  optionalValue: {
+    fontSize: 15,
+    marginTop: 2,
+  },
+
+  divider: {
+    height: 1,
+    background: "#2a2a2a",
+    margin: "6px 0",
+  },
+  sheetOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.6)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "flex-end",
+    zIndex: 999,
+  },
+
+  sheet: {
+    width: "100%",
+    background: "#1c1c1c",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+  },
+
+  sheetHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+
+  sheetClose: {
+    fontSize: 20,
+    cursor: "pointer",
+  },
+
+  sheetTextarea: {
+    width: "100%",
+    height: 160,
+    background: "#111",
+    color: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    border: "1px solid #333",
+    resize: "none",
+  },
+
+  sheetSaveBtn: {
+    width: "100%",
+    marginTop: 16,
+    padding: 14,
+    background: "#5b7cfa",
+    border: "none",
+    borderRadius: 12,
+    fontSize: 16,
+    color: "#fff",
+    cursor: "pointer",
+  },
+  toast: {
+    position: "fixed",
+    bottom: 90, // above total bar
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "#323232",
+    color: "#fff",
+    padding: "12px 18px",
+    borderRadius: 20,
+    fontSize: 14,
+    zIndex: 1000,
+    boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+    animation: "fadeInUp 0.3s ease",
+  },
+  toggleRow: {
+    display: "flex",
+    gap: 20,
+    marginBottom: 12,
+  },
+
+  sheetInput: {
+    width: "100%",
+    padding: 12,
+    marginTop: 10,
+    background: "#111",
+    border: "1px solid #333",
+    borderRadius: 10,
+    color: "#fff",
+  },
+  totalRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: 14,
+    marginBottom: 4,
+  },
+
+  totalRowGreen: {
+    display: "flex",
+    justifyContent: "space-between",
+    color: "#22c55e",
+    fontSize: 14,
+  },
+
+  totalFooter: {
+    marginTop: 12,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 };

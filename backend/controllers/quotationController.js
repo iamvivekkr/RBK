@@ -2,8 +2,11 @@ const Quotation = require("../models/Quotation");
 
 // helper for quotation number
 const generateQuotationNo = async () => {
-  const count = await Quotation.countDocuments();
-  return `EST-${count + 1}`;
+  const last = await Quotation.findOne().sort({ createdAt: -1 });
+  if (!last) return "EST-1";
+
+  const lastNo = Number(last.quotationNo.split("-")[1]);
+  return `EST-${lastNo + 1}`;
 };
 
 // CREATE
@@ -11,9 +14,27 @@ exports.createQuotation = async (req, res) => {
   try {
     const quotationNo = await generateQuotationNo();
 
+    const { items = [], discount = 0, extraCharges = [] } = req.body;
+
+    // Subtotal
+    const subTotal = items.reduce(
+      (sum, i) => sum + Number(i.quantity) * Number(i.price),
+      0
+    );
+
+    // Charges
+    const chargesTotal = extraCharges.reduce((sum, c) => {
+      const tax = (Number(c.amount) * Number(c.taxRate || 0)) / 100;
+      return sum + Number(c.amount) + tax;
+    }, 0);
+
+    const totalAmount = Math.max(subTotal + chargesTotal - discount, 0);
+
     const quotation = new Quotation({
       ...req.body,
       quotationNo,
+      subTotal,
+      totalAmount,
       status: "CREATED",
     });
 
@@ -27,9 +48,12 @@ exports.createQuotation = async (req, res) => {
 // GET ALL
 exports.getQuotations = async (req, res) => {
   try {
+    const limit = Number(req.query.limit) || 20;
+
     const quotations = await Quotation.find()
-      .populate("customer")
-      .sort({ createdAt: -1 });
+      .populate("customer", "name phone")
+      .sort({ createdAt: -1 })
+      .limit(limit);
 
     res.json(quotations);
   } catch (err) {
@@ -56,9 +80,27 @@ exports.getQuotationById = async (req, res) => {
 // UPDATE
 exports.updateQuotation = async (req, res) => {
   try {
+    const { items = [], discount = 0, extraCharges = [] } = req.body;
+
+    const subTotal = items.reduce(
+      (sum, i) => sum + Number(i.quantity) * Number(i.price),
+      0
+    );
+
+    const chargesTotal = extraCharges.reduce((sum, c) => {
+      const tax = (Number(c.amount) * Number(c.taxRate || 0)) / 100;
+      return sum + Number(c.amount) + tax;
+    }, 0);
+
+    const totalAmount = Math.max(subTotal + chargesTotal - discount, 0);
+
     const quotation = await Quotation.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      {
+        ...req.body,
+        subTotal,
+        totalAmount,
+      },
       { new: true }
     );
 

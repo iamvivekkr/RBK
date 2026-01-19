@@ -2,7 +2,11 @@ import { Clipboard } from "lucide-react";
 
 export default function FloatingButton() {
   return (
-    <button style={styles.btn}>
+    <button
+      style={styles.btn}
+      onClick={() => (window.location.href = "/quotation")}
+      aria-label="Go to quotation"
+    >
       <Clipboard />
     </button>
   );
@@ -19,5 +23,6 @@ const styles = {
     width: "60px",
     height: "60px",
     borderRadius: "50%",
+    cursor: "pointer",
   },
 };

@@ -1,6 +1,24 @@
+import { useEffect, useState } from "react";
 import { Printer, Share2 } from "lucide-react";
+import API from "../services/api";
+import { generateQuotationPDF } from "../pages/quotation/pdfGenerator";
 
 export default function RecentHistory() {
+  const [quotations, setQuotations] = useState([]);
+
+  useEffect(() => {
+    loadRecent();
+  }, []);
+
+  const loadRecent = async () => {
+    try {
+      const res = await API.get("/quotations?limit=5");
+      setQuotations(res.data || []);
+    } catch (err) {
+      console.error("Failed to load quotations", err);
+    }
+  };
+
   return (
     <div style={{ margin: "16px" }}>
       <div style={styles.header}>
@@ -8,20 +26,52 @@ export default function RecentHistory() {
         <button style={styles.btn}>View All</button>
       </div>
 
-      {[1, 2, 3].map((i) => (
-        <div key={i} style={styles.card}>
-          <small style={{ color: "#3ddc97" }}>NO.: #QU02222</small>
-          <h5>Customer name</h5>
-          <p>Quotation: ₹ 000.00</p>
+      {quotations.length === 0 && (
+        <div style={{ opacity: 0.6 }}>No quotations yet</div>
+      )}
+
+      {quotations.map((q) => (
+        <div key={q._id} style={styles.card}>
+          <small style={{ color: "#3ddc97" }}>NO.: #{q.quotationNo}</small>
+
+          <h5>{q.customer?.name || "—"}</h5>
+
+          <p>Quotation: ₹ {q.totalAmount || 0}</p>
+
           <div style={styles.icons}>
-            <Printer size={16} />
-            <Share2 size={16} />
+            <Printer
+              size={16}
+              style={{ cursor: "pointer" }}
+              onClick={() => generateQuotationPDF(q)}
+            />
+            <Share2
+              size={16}
+              style={{ cursor: "pointer" }}
+              onClick={() => shareQuotation(q)}
+            />
           </div>
         </div>
       ))}
     </div>
   );
 }
+
+/* ---------------- SHARE ---------------- */
+
+function shareQuotation(q) {
+  const text = `Quotation ${q.quotationNo}
+Customer: ${q.customer?.name}
+Amount: ₹ ${q.totalAmount}`;
+
+  if (navigator.share) {
+    navigator.share({ text });
+  } else {
+    navigator.clipboard.writeText(text);
+    alert("Quotation details copied");
+  }
+}
+
+/* ---------------- STYLES ---------------- */
 
 const styles = {
   header: {
@@ -35,6 +85,7 @@ const styles = {
     border: "none",
     padding: "6px 12px",
     borderRadius: "20px",
+    cursor: "pointer",
   },
   card: {
     background: "#1b1b1b",
