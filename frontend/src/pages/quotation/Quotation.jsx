@@ -60,8 +60,13 @@ export default function Quotation() {
   /* ================= TOTAL CALCULATION ================= */
 
   useEffect(() => {
-    let sub = quotation.products.reduce((sum, p) => sum + p.qty * p.price, 0);
+    // Products total
+    const productsTotal = quotation.products.reduce(
+      (sum, p) => sum + p.qty * p.price,
+      0,
+    );
 
+    // Charges & Tax
     let chargesTotal = 0;
     let totalTax = 0;
 
@@ -73,15 +78,21 @@ export default function Quotation() {
       }
     });
 
-    let total =
-      sub + chargesTotal + totalTax - Number(quotation.extraDiscount || 0);
+    // Discount
+    const discount = Number(quotation.extraDiscount || 0);
+
+    // Sub Total (charges + discount applied, NO TAX)
+    const subTotal = productsTotal + chargesTotal;
+
+    // Grand Total (tax added AFTER)
+    const grandTotal = subTotal + totalTax - discount;
 
     setQuotation((q) => ({
       ...q,
       totals: {
-        subTotal: sub,
-        tax: totalTax,
-        grandTotal: total < 0 ? 0 : Math.round(total),
+        subTotal: Number(subTotal.toFixed(2)),
+        tax: Number(totalTax.toFixed(2)),
+        grandTotal: Number(grandTotal.toFixed(2)),
       },
     }));
   }, [quotation.products, quotation.charges, quotation.extraDiscount]);
@@ -204,13 +215,15 @@ export default function Quotation() {
   };
 
   const openChargeSheet = (type) => {
+    const existing = quotation.charges.find((c) => c.type === type);
+
     setChargeSheet({
       open: true,
-      type, // delivery | packaging
+      type,
       mode: "amount",
-      value: "",
-      taxRate: 5,
-      taxType: "without",
+      value: existing ? existing.amount : "",
+      taxRate: existing ? existing.taxRate : 0,
+      taxType: existing ? existing.taxType : "without",
     });
   };
 
@@ -230,20 +243,27 @@ export default function Quotation() {
   };
 
   const saveCharge = () => {
-    const amount = Number(chargeSheet.value || 0);
+    let amount = Number(chargeSheet.value || 0);
+    const taxRate = Number(chargeSheet.taxRate || 0);
+
+    // If amount includes tax, extract base amount
+    if (chargeSheet.taxType === "with" && taxRate > 0) {
+      amount = amount / (1 + taxRate / 100);
+      amount = Number(amount.toFixed(2)); // round nicely
+    }
 
     setQuotation({
       ...quotation,
       charges: [
         ...quotation.charges.filter((c) => c.type !== chargeSheet.type),
         {
-          type: chargeSheet.type, // delivery | packaging
+          type: chargeSheet.type,
           label:
             chargeSheet.type === "delivery"
               ? "Delivery/Shipping Charges"
               : "Packaging Charges",
           amount,
-          taxRate: chargeSheet.taxRate,
+          taxRate,
           taxType: chargeSheet.taxType,
         },
       ],
@@ -251,6 +271,8 @@ export default function Quotation() {
 
     setChargeSheet({ open: false });
   };
+
+  const isMobile = window.innerWidth <= 768;
 
   /* =====================================================
      PICKERS (FULL-SCREEN OVERLAYS)
@@ -437,7 +459,7 @@ export default function Quotation() {
       {/* OPTIONAL */}
       <div style={styles.optionalHeader}>
         <span>Optional</span>
-        <span style={styles.addChargeBtn}>＋ Additional Charges</span>
+        {/* <span style={styles.addChargeBtn}>＋ Additional Charges</span> */}
       </div>
 
       <div style={styles.optionalCard}>
@@ -450,12 +472,12 @@ export default function Quotation() {
         />
 
         {/* SHIPPING */}
-        <OptionalRow
+        {/* <OptionalRow
           icon="📍"
-          label="Shipping Address"
-          value={quotation.shippingAddress}
+          label="Add Shipping Address"
+          value={quotation.shippingAddress || "Add Shipping Address"}
           action={quotation.shippingAddress ? "Change" : null}
-        />
+        /> */}
 
         {/* BANK */}
         <OptionalRow
@@ -472,7 +494,7 @@ export default function Quotation() {
         <OptionalRow
           icon="✍️"
           label="Signature"
-          value={quotation.signature?.name}
+          value={quotation.signature?.name || ""}
           action={quotation.signature ? "Change" : null}
           onClick={() => setActivePicker("signature")}
         />
@@ -483,7 +505,7 @@ export default function Quotation() {
         <OptionalRow
           icon="📘"
           label="Reference"
-          value={quotation.reference}
+          value={quotation.reference || ""}
           action={quotation.reference ? "Edit" : null}
           onClick={() => openTextSheet("reference")}
         />
@@ -491,7 +513,7 @@ export default function Quotation() {
         <OptionalRow
           icon="📝"
           label="Notes"
-          value={quotation.notes}
+          value={quotation.notes || ""}
           action={quotation.notes ? "Edit" : null}
           onClick={() => openTextSheet("notes")}
         />
@@ -499,16 +521,14 @@ export default function Quotation() {
         <OptionalRow
           icon="📜"
           label="Terms & Conditions"
-          value={quotation.terms}
+          value={quotation.terms || ""}
           action={quotation.terms ? "Edit" : null}
           onClick={() => openTextSheet("terms")}
         />
 
         <Divider />
 
-        {/* CHARGES */}
-        {/* EXTRA DISCOUNT */}
-        {/* EXTRA DISCOUNT */}
+        {/* Extra Discount */}
         {quotation.extraDiscount > 0 ? (
           <OptionalRow
             icon="₹"
@@ -521,6 +541,7 @@ export default function Quotation() {
           <OptionalRow
             icon="₹"
             label="Extra Discount"
+            value=""
             onClick={() => {
               if (!requireProducts()) return;
               openDiscountSheet();
@@ -536,7 +557,7 @@ export default function Quotation() {
               <OptionalRow
                 key={i}
                 icon="₹"
-                label="Delivery/Shipping Charges (+)"
+                label="Delivery / Shipping Charges"
                 value={`₹${c.amount} + ${c.taxRate}%`}
                 action="Change"
                 onClick={() => openChargeSheet("delivery")}
@@ -545,7 +566,8 @@ export default function Quotation() {
         ) : (
           <OptionalRow
             icon="₹"
-            label="Delivery/Shipping Charges"
+            label="Delivery / Shipping Charges"
+            value=""
             onClick={() => {
               if (!requireProducts()) return;
               openChargeSheet("delivery");
@@ -561,7 +583,7 @@ export default function Quotation() {
               <OptionalRow
                 key={i}
                 icon="₹"
-                label="Packaging Charges (+)"
+                label="Packaging Charges"
                 value={`₹${c.amount} + ${c.taxRate}%`}
                 action="Change"
                 onClick={() => openChargeSheet("packaging")}
@@ -571,6 +593,7 @@ export default function Quotation() {
           <OptionalRow
             icon="₹"
             label="Packaging Charges"
+            value=""
             onClick={() => {
               if (!requireProducts()) return;
               openChargeSheet("packaging");
@@ -588,7 +611,7 @@ export default function Quotation() {
             value={
               quotation.attachments.length
                 ? `${quotation.attachments.length} file(s)`
-                : null
+                : ""
             }
             action={quotation.attachments.length ? "Change" : "Add"}
             onClick={() => setActivePicker("attachments")}
@@ -598,8 +621,15 @@ export default function Quotation() {
 
       {/* TOTAL BAR */}
       {quotation.products.length > 0 && (
-        <div style={styles.totalBar}>
-          <div>
+        <div
+          style={{
+            ...styles.totalBar,
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            gap: isMobile ? 12 : 0,
+          }}
+        >
+          <div style={{ width: "100%" }}>
             {quotation.charges.map((c, i) => (
               <div key={i} style={styles.totalRow}>
                 <span>
@@ -630,8 +660,12 @@ export default function Quotation() {
           </div>
 
           <div style={styles.totalFooter}>
-            <strong>Total Amount</strong>
-            <strong>₹{quotation.totals.grandTotal}</strong>
+            <div>
+              <div style={{ fontSize: 14, opacity: 0.7 }}>Total Amount</div>
+              <div style={{ fontSize: 16, fontWeight: "bold" }}>
+                ₹{quotation.totals.grandTotal}
+              </div>
+            </div>
 
             <button style={styles.createBtn} onClick={createQuotation}>
               Create →
@@ -648,8 +682,8 @@ export default function Quotation() {
                 {textSheet.field === "notes"
                   ? "Notes"
                   : textSheet.field === "reference"
-                  ? "Reference"
-                  : "Terms & Conditions"}
+                    ? "Reference"
+                    : "Terms & Conditions"}
               </strong>
 
               <span
@@ -686,8 +720,8 @@ export default function Quotation() {
                 {chargeSheet.type === "discount"
                   ? "Add Extra Discount"
                   : chargeSheet.type === "delivery"
-                  ? "Delivery / Shipping Charges"
-                  : "Packaging Charges"}
+                    ? "Delivery / Shipping Charges"
+                    : "Packaging Charges"}
               </strong>
               <span
                 style={styles.sheetClose}
@@ -804,13 +838,21 @@ function Row({ label, action, onClick }) {
 }
 
 function OptionalRow({ icon, label, value, onClick, action }) {
+  const hasValue = value !== null && value !== undefined && value !== "";
+
   return (
     <div style={styles.optionalRow} onClick={onClick}>
       <div style={styles.optionalLeft}>
         <span style={styles.optionalIcon}>{icon}</span>
+
         <div>
-          <div style={styles.optionalLabel}>{label}</div>
-          <div style={styles.optionalValue}>{value || `Add ${label}`}</div>
+          {/* LABEL */}
+          <div style={styles.optionalLabel}>
+            {hasValue ? label : `Add ${label}`}
+          </div>
+
+          {/* VALUE (only when exists) */}
+          {hasValue && <div style={styles.optionalValue}>{value}</div>}
         </div>
       </div>
 
@@ -830,8 +872,9 @@ const styles = {
     minHeight: "100vh",
     background: "#0e0e0e",
     color: "#fff",
-    paddingBottom: 100,
+    paddingBottom: "calc(180px + env(safe-area-inset-bottom))",
   },
+
   header: {
     display: "flex",
     alignItems: "center",
@@ -878,10 +921,10 @@ const styles = {
   createBtn: {
     background: "#5b7cfa",
     border: "none",
-    padding: "12px 18px",
+    padding: "8px 18px",
     color: "#fff",
     borderRadius: 10,
-    fontSize: 16,
+    fontSize: 14,
     cursor: "pointer",
   },
   selectCard: {
@@ -1111,5 +1154,16 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+  },
+
+  totalBar: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    background: "linear-gradient(180deg, #0b1220, #0b1220)",
+    padding: 16,
+    boxShadow: "0 -6px 20px rgba(0,0,0,0.4)",
   },
 };

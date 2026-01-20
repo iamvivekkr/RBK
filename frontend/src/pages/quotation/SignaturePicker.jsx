@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import API from "../../services/api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function SignaturePicker({ selectedSignature, onDone }) {
   const [signatures, setSignatures] = useState([]);
@@ -60,7 +61,11 @@ export default function SignaturePicker({ selectedSignature, onDone }) {
           onClick={() => onDone(sig)}
         >
           <div style={styles.left}>
-            <img src={sig.image} alt="signature" style={styles.image} />
+            <img
+              src={`${API_URL}${sig.image}`}
+              alt="signature"
+              style={styles.image}
+            />
             <div>
               <div style={styles.name}>{sig.name}</div>
               {sig.isDefault && <div style={styles.default}>Default</div>}
