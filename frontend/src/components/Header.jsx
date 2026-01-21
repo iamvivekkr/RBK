@@ -12,7 +12,7 @@ export default function Header() {
     { label: "Products", path: "/products" },
     { label: "Banks", path: "/banks" },
     { label: "Signature", path: "/signature" },
-    { label: "Shipping Charges", path: "/shipping" },
+    { label: "Dispatch Address", path: "/dispatch-addresses" },
   ];
 
   return (
