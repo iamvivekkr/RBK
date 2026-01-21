@@ -927,17 +927,6 @@ const styles = {
     justifyContent: "space-between",
     padding: "6px 0",
   },
-  totalBar: {
-    position: "fixed",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    background: "#111827",
-    padding: 16,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
   createBtn: {
     background: "#5b7cfa",
     border: "none",
@@ -1184,6 +1173,9 @@ const styles = {
     right: 0,
     background: "linear-gradient(180deg, #0b1220, #0b1220)",
     padding: 16,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
     boxShadow: "0 -6px 20px rgba(0,0,0,0.4)",
   },
 };
