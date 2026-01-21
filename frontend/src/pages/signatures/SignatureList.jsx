@@ -18,6 +18,14 @@ export default function SignatureList({ onAdd, onEdit }) {
     setSignatures(res.data);
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this signature?"))
+      return;
+
+    await API.delete(`/signatures/${id}`);
+    loadSignatures();
+  };
+
   return (
     <div style={styles.page}>
       {/* Header */}
@@ -37,8 +45,15 @@ export default function SignatureList({ onAdd, onEdit }) {
 
           <div style={{ flex: 1 }}>
             <div style={styles.name}>{sig.name}</div>
-            <div style={styles.edit} onClick={() => onEdit(sig)}>
-              View or Edit →
+
+            <div style={styles.actions}>
+              <span style={styles.edit} onClick={() => onEdit(sig)}>
+                View or Edit →
+              </span>
+
+              <span style={styles.delete} onClick={() => handleDelete(sig._id)}>
+                Delete
+              </span>
             </div>
           </div>
 
@@ -101,6 +116,15 @@ const styles = {
     border: "none",
     color: "#fff",
     fontSize: 18,
+    cursor: "pointer",
+  },
+  actions: {
+    display: "flex",
+    gap: 14,
+  },
+
+  delete: {
+    color: "#f44336",
     cursor: "pointer",
   },
 };

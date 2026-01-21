@@ -17,6 +17,14 @@ export default function BankList({ onAdd, onEdit }) {
     setBanks(res.data);
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this bank account?"))
+      return;
+
+    await API.delete(`/banks/${id}`);
+    loadBanks();
+  };
+
   return (
     <div style={styles.page}>
       <div style={styles.header}>
@@ -31,8 +39,18 @@ export default function BankList({ onAdd, onEdit }) {
           <div style={{ flex: 1 }}>
             <div style={styles.name}>{bank.bankName}</div>
             <div style={styles.sub}>{bank.accountNumber}</div>
-            <div style={styles.edit} onClick={() => onEdit(bank)}>
-              View or Edit →
+
+            <div style={styles.actions}>
+              <span style={styles.edit} onClick={() => onEdit(bank)}>
+                View or Edit →
+              </span>
+
+              <span
+                style={styles.delete}
+                onClick={() => handleDelete(bank._id)}
+              >
+                Delete
+              </span>
             </div>
           </div>
 
@@ -78,6 +96,16 @@ const styles = {
     border: "none",
     color: "#fff",
     fontSize: 18,
+    cursor: "pointer",
+  },
+  actions: {
+    display: "flex",
+    gap: 14,
+    marginTop: 6,
+  },
+
+  delete: {
+    color: "#f44336",
     cursor: "pointer",
   },
 };

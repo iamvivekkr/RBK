@@ -1,4 +1,4 @@
-import { Users, Box, Landmark, PenTool } from "lucide-react";
+import { Users, Box, Landmark, PenTool, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function QuickMenu() {
@@ -9,6 +9,11 @@ export default function QuickMenu() {
     { icon: <Box />, label: "Products", path: "/products" },
     { icon: <Landmark />, label: "Banks", path: "/banks" },
     { icon: <PenTool />, label: "Signature", path: "/signatures" },
+    {
+      icon: <MapPin />,
+      label: "Dispatch Address",
+      path: "/dispatch-addresses",
+    },
   ];
 
   return (
@@ -26,7 +31,7 @@ export default function QuickMenu() {
 const styles = {
   container: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
+    gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))",
     gap: "12px",
     margin: "16px",
   },

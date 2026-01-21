@@ -6,6 +6,7 @@ import Banks from "./pages/banks/Banks";
 import Signatures from "./pages/signatures/Signatures";
 import Products from "./pages/products/Products";
 import Quotation from "./pages/quotation/Quotation";
+import DispatchAddress from "./pages/dispatch-address/DispatchAddress";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
       <Route path="/banks" element={<Banks />} />
       <Route path="/products" element={<Products />} />
       <Route path="/quotation" element={<Quotation />} />
+      <Route path="/dispatch-addresses" element={<DispatchAddress />} />
     </Routes>
   );
 }

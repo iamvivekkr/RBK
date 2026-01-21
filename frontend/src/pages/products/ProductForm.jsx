@@ -39,7 +39,7 @@ export default function ProductForm({ product, onBack }) {
     <div style={styles.page}>
       <div style={styles.header}>
         <ArrowLeft onClick={onBack} style={{ cursor: "pointer" }} />
-        <h3>Add Product</h3>
+        <h3>{product ? "Edit Product" : "Add Product"}</h3>
       </div>
 
       <div style={styles.card}>
@@ -56,7 +56,7 @@ export default function ProductForm({ product, onBack }) {
       </div>
 
       <button style={styles.submitBtn} onClick={submit}>
-        Add Product
+        {product ? "Update Product" : "Add Product"}
       </button>
     </div>
   );

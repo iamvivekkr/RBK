@@ -22,8 +22,16 @@ export default function CustomerList({ onAdd, onEdit }) {
   const filteredCustomers = customers.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
+      c.phone.includes(search),
   );
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this customer?"))
+      return;
+
+    await API.delete(`/customers/${id}`);
+    loadCustomers();
+  };
 
   return (
     <div style={styles.page}>
@@ -52,10 +60,21 @@ export default function CustomerList({ onAdd, onEdit }) {
       {filteredCustomers.map((c) => (
         <div key={c._id} style={styles.item} onClick={() => onEdit(c)}>
           <div style={styles.avatar}>{c.name.charAt(0).toUpperCase()}</div>
-          <div>
+
+          <div style={{ flex: 1 }}>
             <div style={styles.name}>{c.name}</div>
             <div style={styles.phone}>{c.phone}</div>
           </div>
+
+          <span
+            style={styles.delete}
+            onClick={(e) => {
+              e.stopPropagation(); // prevents edit click
+              handleDelete(c._id);
+            }}
+          >
+            Delete
+          </span>
         </div>
       ))}
     </div>
@@ -111,4 +130,9 @@ const styles = {
   },
   name: { fontSize: 16 },
   phone: { fontSize: 13, opacity: 0.7 },
+  delete: {
+    color: "#f44336",
+    fontSize: 14,
+    cursor: "pointer",
+  },
 };

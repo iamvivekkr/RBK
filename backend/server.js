@@ -8,6 +8,7 @@ const signatureRoutes = require("./routes/signatureRoutes");
 const bankRoutes = require("./routes/bankRoutes");
 const productRoutes = require("./routes/productRoutes");
 const quotationRoutes = require("./routes/quotationRoutes");
+const dispatchAddressRoutes = require("./routes/dispatchAddressRoutes");
 
 dotenv.config();
 connectDB();
@@ -26,6 +27,7 @@ app.use("/api/signatures", signatureRoutes);
 app.use("/api/banks", bankRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/quotations", quotationRoutes);
+app.use("/api/dispatch-addresses", dispatchAddressRoutes);
 
 app.get("/", (req, res) => {
   res.send("RBK Quotation API Running");

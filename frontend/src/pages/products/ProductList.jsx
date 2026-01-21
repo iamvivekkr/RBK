@@ -18,8 +18,16 @@ export default function ProductList({ onAdd, onEdit }) {
   };
 
   const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase()),
   );
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this product?"))
+      return;
+
+    await API.delete(`/products/${id}`);
+    loadProducts(); // refresh list
+  };
 
   return (
     <div style={styles.page}>
@@ -45,7 +53,18 @@ export default function ProductList({ onAdd, onEdit }) {
             <div style={styles.sub}>₹{p.sellingPrice}</div>
           </div>
 
-          <div style={styles.qty}>Qty: 0.00</div>
+          <div style={styles.actions}>
+            <button style={styles.editBtn} onClick={() => onEdit(p)}>
+              Edit
+            </button>
+
+            <button
+              style={styles.deleteBtn}
+              onClick={() => handleDelete(p._id)}
+            >
+              Delete
+            </button>
+          </div>
         </div>
       ))}
 
@@ -95,6 +114,28 @@ const styles = {
     border: "none",
     color: "#fff",
     fontSize: 18,
+    cursor: "pointer",
+  },
+  actions: {
+    display: "flex",
+    gap: 8,
+  },
+
+  editBtn: {
+    padding: "6px 10px",
+    borderRadius: 6,
+    border: "none",
+    background: "#4caf50",
+    color: "#fff",
+    cursor: "pointer",
+  },
+
+  deleteBtn: {
+    padding: "6px 10px",
+    borderRadius: 6,
+    border: "none",
+    background: "#f44336",
+    color: "#fff",
     cursor: "pointer",
   },
 };

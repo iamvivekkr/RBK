@@ -11,6 +11,7 @@ import BankPicker from "./BankPicker";
 import SignaturePicker from "./SignaturePicker";
 import AttachmentsPicker from "./AttachmentsPicker";
 import QuotationPreview from "./QuotationPreview";
+import DispatchAddressPicker from "./DispatchAddressPicker";
 
 export default function Quotation() {
   const navigate = useNavigate();
@@ -357,6 +358,20 @@ export default function Quotation() {
     );
   }
 
+  if (activePicker === "dispatch") {
+    return (
+      <DispatchAddressPicker
+        selectedAddress={quotation.dispatchAddress}
+        onDone={(address) => {
+          if (address) {
+            setQuotation({ ...quotation, dispatchAddress: address });
+          }
+          setActivePicker(null);
+        }}
+      />
+    );
+  }
+
   /* =====================================================
      MAIN QUOTATION UI (ALWAYS PRESENT)
   ===================================================== */
@@ -365,7 +380,7 @@ export default function Quotation() {
     <div style={styles.page}>
       {/* HEADER */}
       <div style={styles.header}>
-        <ArrowLeft onClick={() => navigate(-1)} />
+        <ArrowLeft onClick={() => navigate(-1)} style={{ cursor: "pointer" }} />
         <h3>
           {quotation.document.prefix}-{quotation.document.number}
         </h3>
@@ -467,8 +482,13 @@ export default function Quotation() {
         <OptionalRow
           icon="🚚"
           label="Dispatch Address"
-          value={quotation.dispatchAddress}
-          action={quotation.dispatchAddress ? "Change" : null}
+          value={
+            quotation.dispatchAddress
+              ? `${quotation.dispatchAddress.addressLine1}, ${quotation.dispatchAddress.city}`
+              : ""
+          }
+          action={quotation.dispatchAddress ? "Change" : ""}
+          onClick={() => setActivePicker("dispatch")}
         />
 
         {/* SHIPPING */}
