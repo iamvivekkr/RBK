@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import API from "../../services/api";
 
@@ -20,8 +21,8 @@ export default function Quotation() {
 
   const [quotation, setQuotation] = useState({
     document: {
-      prefix: "EST",
-      number: 2,
+      prefix: "",
+      number: "",
       date: new Date().toISOString().slice(0, 10),
       dueDate: "",
       title: "Quotation",
@@ -133,6 +134,37 @@ export default function Quotation() {
 
     setTextSheet({ open: false, field: null, value: "" });
   };
+  const { id } = useParams();
+
+  useEffect(() => {
+    if (id) return; // edit mode → don't generate
+
+    const fetchNext = async () => {
+      const { data } = await API.get("/quotations/next-number");
+
+      setQuotation((q) => ({
+        ...q,
+        document: {
+          ...q.document,
+          prefix: data.prefix,
+          number: data.number,
+          date: data.date,
+        },
+      }));
+    };
+
+    fetchNext();
+  }, [id]);
+
+  const [docSheet, setDocSheet] = useState({
+    open: false,
+    prefix: "",
+    number: "",
+    date: "",
+    dueDate: "",
+  });
+
+  const [gstType, setGstType] = useState("with"); // "with" | "without"
 
   /* ================= CREATE ================= */
 
@@ -381,10 +413,61 @@ export default function Quotation() {
       {/* HEADER */}
       <div style={styles.header}>
         <ArrowLeft onClick={() => navigate(-1)} style={{ cursor: "pointer" }} />
-        <h3>
-          {quotation.document.prefix}-{quotation.document.number}
-        </h3>
-        <Pencil />
+        <h3 style={{ flex: 1 }}>Create Quotation</h3>
+      </div>
+
+      <div style={styles.quoteCard}>
+        <div style={styles.quoteCardTop}>
+          <div>
+            <div style={styles.quoteLabel}>Quotation #</div>
+            <div style={styles.quoteNumber}>
+              {quotation.document.prefix}-{quotation.document.number}
+            </div>
+            <div style={styles.quoteDate}>
+              {quotation.document.date}
+              {quotation.document.dueDate && (
+                <> , Due on : {quotation.document.dueDate}</>
+              )}
+            </div>
+          </div>
+
+          <span
+            style={{ ...styles.link, cursor: "pointer" }}
+            onClick={() =>
+              setDocSheet({
+                open: true,
+                prefix: quotation.document.prefix,
+                number: quotation.document.number,
+                date: quotation.document.date,
+                dueDate: quotation.document.dueDate,
+              })
+            }
+          >
+            Edit
+          </span>
+        </div>
+
+        <div style={styles.gstRow}>
+          <label style={{ cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="gstType"
+              checked={gstType === "with"}
+              onChange={() => setGstType("with")}
+            />{" "}
+            With GST
+          </label>
+
+          <label style={{ cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="gstType"
+              checked={gstType === "without"}
+              onChange={() => setGstType("without")}
+            />{" "}
+            Without GST
+          </label>
+        </div>
       </div>
 
       {/* EXPORT */}
@@ -833,6 +916,81 @@ export default function Quotation() {
           </div>
         </div>
       )}
+
+      {docSheet.open && (
+        <div style={styles.sheetOverlay}>
+          <div style={styles.sheet}>
+            <div style={styles.sheetHeader}>
+              <strong>Edit Document</strong>
+              <span
+                style={styles.sheetClose}
+                onClick={() => setDocSheet({ open: false })}
+              >
+                ✕
+              </span>
+            </div>
+
+            <label style={styles.label}>Prefix</label>
+            <input
+              style={styles.sheetInput}
+              value={docSheet.prefix}
+              onChange={(e) =>
+                setDocSheet({ ...docSheet, prefix: e.target.value })
+              }
+            />
+
+            <label style={styles.label}>Document Number</label>
+            <input
+              type="number"
+              style={styles.sheetInput}
+              value={docSheet.number}
+              onChange={(e) =>
+                setDocSheet({ ...docSheet, number: e.target.value })
+              }
+            />
+
+            <label style={styles.label}>Document Date</label>
+            <input
+              type="date"
+              style={styles.sheetInput}
+              value={docSheet.date}
+              onChange={(e) =>
+                setDocSheet({ ...docSheet, date: e.target.value })
+              }
+            />
+
+            <label style={styles.label}>Due Date</label>
+            <input
+              type="date"
+              style={styles.sheetInput}
+              value={docSheet.dueDate}
+              onChange={(e) =>
+                setDocSheet({ ...docSheet, dueDate: e.target.value })
+              }
+            />
+
+            <button
+              style={styles.sheetSaveBtn}
+              onClick={() => {
+                setQuotation((q) => ({
+                  ...q,
+                  document: {
+                    ...q.document,
+                    prefix: docSheet.prefix,
+                    number: docSheet.number,
+                    date: docSheet.date,
+                    dueDate: docSheet.dueDate,
+                  },
+                }));
+
+                setDocSheet({ open: false });
+              }}
+            >
+              Save & Update
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1177,5 +1335,46 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     boxShadow: "0 -6px 20px rgba(0,0,0,0.4)",
+  },
+  label: {
+    fontSize: 13,
+    opacity: 0.7,
+    marginTop: 10,
+    display: "block",
+  },
+  quoteCard: {
+    background: "#2a2a2a",
+    margin: 12,
+    padding: 16,
+    borderRadius: 14,
+  },
+
+  quoteCardTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+
+  quoteLabel: {
+    fontSize: 13,
+    opacity: 0.6,
+  },
+
+  quoteNumber: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginTop: 4,
+  },
+
+  quoteDate: {
+    fontSize: 13,
+    opacity: 0.6,
+    marginTop: 4,
+  },
+
+  gstRow: {
+    display: "flex",
+    gap: 24,
+    marginTop: 16,
   },
 };

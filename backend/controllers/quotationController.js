@@ -19,7 +19,7 @@ exports.createQuotation = async (req, res) => {
     // Subtotal
     const subTotal = items.reduce(
       (sum, i) => sum + Number(i.quantity) * Number(i.price),
-      0
+      0,
     );
 
     // Charges
@@ -65,7 +65,7 @@ exports.getQuotations = async (req, res) => {
 exports.getQuotationById = async (req, res) => {
   try {
     const quotation = await Quotation.findById(req.params.id).populate(
-      "customer bank signature"
+      "customer bank signature",
     );
 
     if (!quotation)
@@ -84,7 +84,7 @@ exports.updateQuotation = async (req, res) => {
 
     const subTotal = items.reduce(
       (sum, i) => sum + Number(i.quantity) * Number(i.price),
-      0
+      0,
     );
 
     const chargesTotal = extraCharges.reduce((sum, c) => {
@@ -101,7 +101,7 @@ exports.updateQuotation = async (req, res) => {
         subTotal,
         totalAmount,
       },
-      { new: true }
+      { new: true },
     );
 
     if (!quotation)
@@ -121,4 +121,21 @@ exports.deleteQuotation = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+};
+
+// GET /quotations/next-number
+exports.getNextQuotationNumber = async (req, res) => {
+  const last = await Quotation.findOne().sort({ createdAt: -1 });
+
+  let number = 1;
+  if (last?.quotationNo) {
+    number = Number(last.quotationNo.split("-")[1]) + 1;
+  }
+
+  res.json({
+    prefix: "EST",
+    number,
+    quotationNo: `EST-${number}`,
+    date: new Date().toISOString().slice(0, 10),
+  });
 };
