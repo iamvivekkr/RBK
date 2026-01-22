@@ -7,93 +7,125 @@ export default function QuotationPreview({ quotation, onBack }) {
       {/* HEADER */}
       <div style={styles.header}>
         <ArrowLeft onClick={onBack} style={{ cursor: "pointer" }} />
-        <h3>Quotation Preview</h3>
+        <div>
+          <div style={styles.headerTitle}>
+            {quotation.document.prefix}-{quotation.document.number}
+          </div>
+          <div style={styles.headerSub}>Quotation</div>
+        </div>
         <Download
-          style={{ cursor: "pointer" }}
+          style={{ cursor: "pointer", marginLeft: "auto" }}
           onClick={() => generateQuotationPDF(quotation)}
         />
       </div>
 
-      {/* BODY */}
-      <div style={styles.body}>
-        {/* COMPANY */}
-        <h2>Quotation</h2>
-        <p>
-          {quotation.document?.prefix}-{quotation.document?.number}
-        </p>
+      {/* CUSTOMER */}
+      <Section title="Customer Details">
+        <Card>
+          <strong>{quotation.customer?.name}</strong>
+          <div style={styles.muted}>
+            Invoice Date: {quotation.document.date}
+          </div>
+          {quotation.customer?.phone && (
+            <div style={styles.muted}>{quotation.customer.phone}</div>
+          )}
+          {quotation.customer?.email && (
+            <div style={styles.muted}>{quotation.customer.email}</div>
+          )}
+        </Card>
+      </Section>
 
-        {/* CUSTOMER */}
-        <Section title="Customer">
-          <p>{quotation.customer?.name}</p>
-          <p>{quotation.customer?.phone}</p>
-          {quotation.customer?.email && <p>{quotation.customer.email}</p>}
+      {/* SHIPPING */}
+      {quotation.dispatchAddress && (
+        <Section title="Shipping Address">
+          <Card>
+            <strong>{quotation.dispatchAddress.addressLine1}</strong>
+            <div style={styles.muted}>
+              {quotation.dispatchAddress.city},{" "}
+              {quotation.dispatchAddress.state} -{" "}
+              {quotation.dispatchAddress.pincode}
+            </div>
+          </Card>
         </Section>
+      )}
 
-        {/* PRODUCTS */}
-        <Section title="Items">
+      {/* ITEMS */}
+      <Section title={`Items (${quotation.products.length})`}>
+        <Card>
           {quotation.products.map((p, i) => (
-            <div key={i} style={styles.row}>
-              <span>
-                {p.name} × {p.qty}
-              </span>
-              <strong>₹ {p.qty * p.price}</strong>
+            <div key={i} style={styles.itemRow}>
+              <div>
+                <strong>{p.name}</strong>
+                <div style={styles.muted}>
+                  Qty: {p.qty} {p.unit || ""}
+                </div>
+              </div>
+              <strong>₹{p.qty * p.price}</strong>
             </div>
           ))}
-        </Section>
+        </Card>
+      </Section>
 
-        {/* TOTALS */}
-        <Section title="Summary">
-          <Row label="Subtotal" value={`₹ ${quotation.totals.subTotal}`} />
-          {quotation.extraDiscount > 0 && (
-            <Row label="Discount" value={`- ₹ ${quotation.extraDiscount}`} />
-          )}
+      {/* BILL SUMMARY */}
+      <Section title="Bill Summary">
+        <Card>
           {quotation.charges.map((c, i) => (
-            <Row key={i} label={c.label} value={`₹ ${c.amount}`} />
+            <SummaryRow key={i} label={c.label} value={`₹${c.amount}`} />
           ))}
-          <Row
-            label="Grand Total"
-            value={`₹ ${quotation.totals.grandTotal}`}
+
+          <SummaryRow
+            label={`Subtotal (${quotation.products.length} item)`}
+            value={`₹${quotation.totals.subTotal}`}
+          />
+
+          {quotation.totals.tax > 0 && (
+            <SummaryRow
+              label="GST"
+              value={`₹${quotation.totals.tax.toFixed(2)}`}
+            />
+          )}
+
+          {quotation.extraDiscount > 0 && (
+            <SummaryRow
+              label="Discount"
+              value={`-₹${quotation.extraDiscount}`}
+              green
+            />
+          )}
+
+          <Divider />
+
+          <SummaryRow
+            label="Total Amount"
+            value={`₹${quotation.totals.grandTotal}`}
             bold
           />
-        </Section>
+        </Card>
+      </Section>
 
-        {/* BANK */}
-        {quotation.bank && (
-          <Section title="Bank">
-            <p>
-              {quotation.bank.type === "CASH"
-                ? "Cash"
-                : quotation.bank.bankName}
-            </p>
-          </Section>
-        )}
-
-        {/* SIGNATURE */}
-        {quotation.signature && quotation.signature !== "NONE" && (
-          <Section title="Authorized Signature">
-            <img
-              src={quotation.signature.image}
-              alt="signature"
-              style={{ width: 120 }}
+      {/* OTHERS */}
+      <Section title="Others">
+        <Card>
+          {quotation.bank && (
+            <OtherRow
+              label="Bank"
+              value={
+                quotation.bank.type === "CASH"
+                  ? "Cash"
+                  : quotation.bank.bankName
+              }
             />
-            <p>{quotation.signature.name}</p>
-          </Section>
-        )}
+          )}
 
-        {/* NOTES */}
-        {quotation.notes && (
-          <Section title="Notes">
-            <p>{quotation.notes}</p>
-          </Section>
-        )}
+          {quotation.signature && quotation.signature !== "NONE" && (
+            <OtherRow label="Signature" value={quotation.signature.name} />
+          )}
 
-        {/* TERMS */}
-        {quotation.terms && (
-          <Section title="Terms & Conditions">
-            <p>{quotation.terms}</p>
-          </Section>
-        )}
-      </div>
+          {quotation.reference && (
+            <OtherRow label="Reference" value={quotation.reference} />
+          )}
+        </Card>
+      </Section>
     </div>
   );
 }
@@ -102,42 +134,88 @@ export default function QuotationPreview({ quotation, onBack }) {
 
 const Section = ({ title, children }) => (
   <div style={styles.section}>
-    <h4>{title}</h4>
+    <div style={styles.sectionTitle}>{title}</div>
     {children}
   </div>
 );
 
-const Row = ({ label, value, bold }) => (
+const Card = ({ children }) => <div style={styles.card}>{children}</div>;
+
+const SummaryRow = ({ label, value, bold, green }) => (
   <div style={styles.row}>
     <span>{label}</span>
-    <strong style={bold ? {} : { fontWeight: "normal" }}>{value}</strong>
+    <span
+      style={{
+        fontWeight: bold ? "bold" : "normal",
+        color: green ? "#22c55e" : "#fff",
+      }}
+    >
+      {value}
+    </span>
   </div>
 );
+
+const OtherRow = ({ label, value }) => (
+  <div style={styles.row}>
+    <span>{label}</span>
+    <span style={styles.muted}>{value}</span>
+  </div>
+);
+
+const Divider = () => <div style={styles.divider} />;
 
 /* ---------------- STYLES ---------------- */
 
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#fff",
-    color: "#000",
+    background: "#0e0e0e",
+    color: "#fff",
   },
   header: {
     display: "flex",
+    alignItems: "center",
     gap: 12,
     padding: 16,
-    borderBottom: "1px solid #ddd",
-    alignItems: "center",
+    background: "#2a2a2a",
   },
-  body: {
-    padding: 24,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  headerSub: {
+    fontSize: 13,
+    opacity: 0.7,
   },
   section: {
-    marginBottom: 24,
+    margin: 12,
+  },
+  sectionTitle: {
+    opacity: 0.7,
+    marginBottom: 8,
+  },
+  card: {
+    background: "#1c1c1c",
+    borderRadius: 14,
+    padding: 14,
   },
   row: {
     display: "flex",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  itemRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  muted: {
+    opacity: 0.6,
+    fontSize: 13,
+  },
+  divider: {
+    height: 1,
+    background: "#333",
+    margin: "10px 0",
   },
 };
