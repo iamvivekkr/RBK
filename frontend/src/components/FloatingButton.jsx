@@ -1,10 +1,12 @@
 import { Clipboard } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function FloatingButton() {
+  const navigate = useNavigate();
   return (
     <button
       style={styles.btn}
-      onClick={() => (window.location.href = "/quotation")}
+      onClick={() => navigate("/quotation")}
       aria-label="Go to quotation"
     >
       <Clipboard />
