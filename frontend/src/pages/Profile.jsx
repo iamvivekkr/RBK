@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, ImagePlus, X } from "lucide-react";
+import { ArrowLeft, Plus, ImagePlus, X, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { saveCompany, uploadLogo, getCompany } from "../services/companyApi";
@@ -39,7 +39,7 @@ export default function Profile() {
       if (res.data) {
         setCompany(res.data);
         if (res.data.logo) {
-          setPreview(`http://localhost:5000${res.data.logo}`);
+          setPreview(`${import.meta.env.VITE_API_URL}${res.data.logo}`);
         }
       }
     });
@@ -58,7 +58,7 @@ export default function Profile() {
     setAddress(
       type === "Billing"
         ? company.billingAddress || {}
-        : company.shippingAddress || {}
+        : company.shippingAddress || {},
     );
     setShowModal(true);
   };
@@ -106,11 +106,16 @@ export default function Profile() {
             ) : (
               <ImagePlus size={34} />
             )}
-            <FieldsetInput
-              hidden
+
+            <div style={styles.editOverlay}>
+              <Pencil size={16} />
+            </div>
+
+            <input
               type="file"
               accept="image/*"
               onChange={handleLogoChange}
+              style={{ display: "none" }}
             />
           </label>
 
@@ -295,6 +300,7 @@ const styles = {
   header: { display: "flex", gap: 12, padding: 16, fontSize: 18 },
   card: { background: "#1c1c1c", margin: 16, padding: 16, borderRadius: 16 },
   logoBox: {
+    position: "relative",
     width: 80,
     height: 80,
     borderRadius: 16,
@@ -305,7 +311,9 @@ const styles = {
     justifyContent: "center",
     cursor: "pointer",
     overflow: "hidden",
+    transition: "opacity 0.2s",
   },
+
   logoImg: { width: "100%", height: "100%", objectFit: "cover" },
   logoText: { textAlign: "center", fontSize: 13, opacity: 0.7, margin: 10 },
   fieldset: {
@@ -410,5 +418,17 @@ const styles = {
     cursor: "pointer",
     color: "#ff4d4f",
     fontWeight: "bold",
+  },
+  editOverlay: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    background: "rgba(0,0,0,0.6)",
+    borderRadius: "50%",
+    padding: 6,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.9,
   },
 };
