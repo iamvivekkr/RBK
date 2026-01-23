@@ -9,6 +9,7 @@ export default function Profile() {
   /* ---------------- STATE ---------------- */
   const [logo, setLogo] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [saveMessage, setSaveMessage] = useState("");
 
   const [company, setCompany] = useState({
     name: "",
@@ -21,6 +22,7 @@ export default function Profile() {
     website: "",
     billingAddress: {},
     shippingAddress: {},
+    logo: "",
   });
 
   const [showModal, setShowModal] = useState(false);
@@ -36,7 +38,7 @@ export default function Profile() {
   /* ---------------- LOAD COMPANY ---------------- */
   useEffect(() => {
     getCompany().then((res) => {
-      if (res.data) {
+      if (res?.data) {
         setCompany(res.data);
         if (res.data.logo) {
           setPreview(`${import.meta.env.VITE_API_URL}${res.data.logo}`);
@@ -44,6 +46,13 @@ export default function Profile() {
       }
     });
   }, []);
+
+  /* ---------------- AUTO HIDE MESSAGE ---------------- */
+  useEffect(() => {
+    if (!saveMessage) return;
+    const t = setTimeout(() => setSaveMessage(""), 2500);
+    return () => clearTimeout(t);
+  }, [saveMessage]);
 
   /* ---------------- HANDLERS ---------------- */
   const handleLogoChange = (e) => {
@@ -64,26 +73,39 @@ export default function Profile() {
   };
 
   const saveAddress = () => {
-    setCompany({
-      ...company,
+    setCompany((prev) => ({
+      ...prev,
       [addressType === "Billing" ? "billingAddress" : "shippingAddress"]:
         address,
-    });
+    }));
     setShowModal(false);
   };
 
   const handleSaveProfile = async () => {
     if (!company.name || !company.phone || !company.email) {
-      alert("Company Name, Phone and Email are required");
+      setSaveMessage("Company Name, Phone and Email are required ❌");
       return;
     }
 
     try {
-      if (logo) await uploadLogo(logo);
-      await saveCompany(company);
-      alert("Profile saved successfully");
+      setSaveMessage("Saving...");
+
+      let updatedCompany = { ...company };
+
+      if (logo) {
+        const res = await uploadLogo(logo);
+        if (!res?.data?.logo) throw new Error("Logo upload failed");
+        updatedCompany.logo = res.data.logo;
+      }
+
+      await saveCompany(updatedCompany);
+      setCompany(updatedCompany);
+      setLogo(null);
+
+      setSaveMessage("Profile saved successfully ✅");
     } catch (err) {
-      alert(err.response?.data?.message || "Error saving profile");
+      console.error(err);
+      setSaveMessage(err.response?.data?.message || "Error saving profile ❌");
     }
   };
 
@@ -96,21 +118,18 @@ export default function Profile() {
         <span>Company Details</span>
       </div>
 
-      {/* Scrollable Content */}
       <div style={styles.content}>
-        {/* Company Card */}
         <div style={styles.card}>
+          {/* LOGO */}
           <label style={styles.logoBox}>
             {preview ? (
               <img src={preview} alt="logo" style={styles.logoImg} />
             ) : (
               <ImagePlus size={34} />
             )}
-
             <div style={styles.editOverlay}>
               <Pencil size={16} />
             </div>
-
             <input
               type="file"
               accept="image/*"
@@ -150,7 +169,6 @@ export default function Profile() {
           />
         </div>
 
-        {/* Billing */}
         <Section title="Billing Address">
           <AddressCard
             type="Billing"
@@ -160,7 +178,6 @@ export default function Profile() {
           />
         </Section>
 
-        {/* Shipping */}
         <Section title="Shipping Address">
           <AddressCard
             type="Shipping"
@@ -170,7 +187,6 @@ export default function Profile() {
           />
         </Section>
 
-        {/* Optional Fields */}
         <Section title="Optional Fields">
           <FieldsetInput
             label="PAN"
@@ -194,35 +210,33 @@ export default function Profile() {
         </Section>
       </div>
 
-      {/* Save Button */}
+      {saveMessage && <div style={styles.saveMessage}>{saveMessage}</div>}
+
       <button style={styles.saveBtn} onClick={handleSaveProfile}>
         Save & Update
       </button>
 
-      {/* Bottom Modal */}
+      {/* ADDRESS MODAL */}
       {showModal && (
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
               <span>Enter {addressType} Address</span>
               <X
-                size={20}
                 onClick={() => setShowModal(false)}
                 style={{ cursor: "pointer" }}
               />
             </div>
 
-            {/* Scrollable Inputs */}
             <div style={styles.modalContent}>
               {["line1", "line2", "pincode", "city", "state"].map((f) => (
                 <FieldsetInput
                   key={f}
-                  placeholder={f.replace(/^\w/, (c) => c.toUpperCase())}
+                  label={f.toUpperCase()}
                   value={address[f] || ""}
                   onChange={(e) =>
                     setAddress({ ...address, [f]: e.target.value })
                   }
-                  style={styles.input}
                 />
               ))}
             </div>
@@ -255,8 +269,7 @@ const Section = ({ title, children }) => (
 
 const AddButton = ({ label, onClick }) => (
   <div style={styles.addBtn} onClick={onClick}>
-    <Plus size={16} />
-    <span>{label}</span>
+    <Plus size={16} /> <span>{label}</span>
   </div>
 );
 
@@ -264,7 +277,6 @@ const AddressCard = ({ type, address, onEdit, onDelete }) => {
   if (!address || Object.keys(address).length === 0) {
     return <AddButton label={`+ ${type} Address`} onClick={onEdit} />;
   }
-
   return (
     <div style={styles.addressCard}>
       <div>
@@ -288,15 +300,8 @@ const AddressCard = ({ type, address, onEdit, onDelete }) => {
 
 /* ---------------- STYLES ---------------- */
 const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "#0e0e0e",
-    color: "#fff",
-    position: "relative",
-  },
-  content: {
-    paddingBottom: 100, // space for fixed Save button
-  },
+  page: { minHeight: "100vh", background: "#0e0e0e", color: "#fff" },
+  content: { paddingBottom: 100 },
   header: { display: "flex", gap: 12, padding: 16, fontSize: 18 },
   card: { background: "#1c1c1c", margin: 16, padding: 16, borderRadius: 16 },
   logoBox: {
@@ -306,38 +311,31 @@ const styles = {
     borderRadius: 16,
     background: "#f0f0f0",
     margin: "auto",
+    cursor: "pointer",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    cursor: "pointer",
-    overflow: "hidden",
-    transition: "opacity 0.2s",
   },
-
   logoImg: { width: "100%", height: "100%", objectFit: "cover" },
+  editOverlay: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    background: "rgba(0,0,0,0.6)",
+    borderRadius: "50%",
+    padding: 6,
+  },
   logoText: { textAlign: "center", fontSize: 13, opacity: 0.7, margin: 10 },
-  fieldset: {
-    border: "1px solid #444",
-    borderRadius: 8,
-    padding: "12px 12px 4px",
-    marginBottom: 12,
-    color: "#fff",
-  },
-  legend: {
-    padding: "0 6px",
-    color: "#aaa",
-    fontSize: 12,
-  },
+  fieldset: { border: "1px solid #444", borderRadius: 8, marginBottom: 12 },
+  legend: { color: "#aaa", fontSize: 12 },
   fieldsetInput: {
     width: "100%",
     background: "transparent",
     border: "none",
     outline: "none",
     color: "#fff",
-    fontSize: 14,
-    padding: 4,
+    padding: 8,
   },
-
   sectionTitle: { margin: "20px 16px 8px", opacity: 0.7 },
   sectionBox: { background: "#1c1c1c", margin: "0 16px", borderRadius: 14 },
   addBtn: { display: "flex", gap: 8, padding: 12, cursor: "pointer" },
@@ -352,8 +350,18 @@ const styles = {
     border: "none",
     color: "#fff",
     fontSize: 16,
-    zIndex: 10,
     cursor: "pointer",
+  },
+  saveMessage: {
+    position: "fixed",
+    bottom: 80,
+    left: 16,
+    right: 16,
+    background: "#1c1c1c",
+    padding: 12,
+    textAlign: "center",
+    color: "#55b6a2",
+    borderRadius: 12,
   },
   overlay: {
     position: "fixed",
@@ -362,29 +370,16 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "flex-end",
-    zIndex: 20,
   },
   modal: {
     width: "100%",
-    maxHeight: "80vh",
     background: "#1c1c1c",
+    padding: 16,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 16,
-    display: "flex",
-    flexDirection: "column",
   },
-  modalHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingBottom: 10,
-  },
-  modalContent: {
-    flexGrow: 1,
-    overflowY: "auto",
-    paddingBottom: 16,
-  },
+  modalHeader: { display: "flex", justifyContent: "space-between" },
+  modalContent: { maxHeight: "60vh", overflowY: "auto" },
   modalBtn: {
     width: "100%",
     padding: 14,
@@ -392,43 +387,16 @@ const styles = {
     background: "#55b6a2",
     border: "none",
     color: "#fff",
-    marginTop: 8,
-    flexShrink: 0,
   },
   addressCard: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 12,
     background: "#2a2a2a",
+    padding: 12,
     borderRadius: 10,
     margin: "8px 0",
-    color: "#fff",
-  },
-  addressActions: {
     display: "flex",
-    gap: 8,
+    justifyContent: "space-between",
   },
-  editBtn: {
-    cursor: "pointer",
-    color: "#55b6a2",
-    fontWeight: "bold",
-  },
-  deleteBtn: {
-    cursor: "pointer",
-    color: "#ff4d4f",
-    fontWeight: "bold",
-  },
-  editOverlay: {
-    position: "absolute",
-    bottom: 6,
-    right: 6,
-    background: "rgba(0,0,0,0.6)",
-    borderRadius: "50%",
-    padding: 6,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    opacity: 0.9,
-  },
+  addressActions: { display: "flex", gap: 8 },
+  editBtn: { color: "#55b6a2", cursor: "pointer" },
+  deleteBtn: { color: "#ff4d4f", cursor: "pointer" },
 };
