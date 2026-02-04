@@ -1,6 +1,7 @@
 import { ArrowLeft, Plus, ImagePlus, X, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useCompany } from "../context/CompanyContext";
 import { saveCompany, uploadLogo, getCompany } from "../services/companyApi";
 
 export default function Profile() {
@@ -24,6 +25,7 @@ export default function Profile() {
     shippingAddress: {},
     logo: "",
   });
+  const { setCompany: setCompanyContext } = useCompany();
 
   const [showModal, setShowModal] = useState(false);
   const [addressType, setAddressType] = useState("");
@@ -36,15 +38,34 @@ export default function Profile() {
   });
 
   /* ---------------- LOAD COMPANY ---------------- */
+  /* ---------------- LOAD COMPANY ---------------- */
   useEffect(() => {
-    getCompany().then((res) => {
-      if (res?.data) {
+    async function loadCompany() {
+      try {
+        const res = await getCompany();
+        if (!res?.data) return;
+
+        // 1️⃣ local form state (Profile page)
         setCompany(res.data);
+
+        // 2️⃣ global context (Header)
+        setCompanyContext({
+          name: res.data.name || "RBK Company",
+          logo: res.data.logo
+            ? `${import.meta.env.VITE_API_URL}${res.data.logo}`
+            : "",
+        });
+
+        // 3️⃣ logo preview
         if (res.data.logo) {
           setPreview(`${import.meta.env.VITE_API_URL}${res.data.logo}`);
         }
+      } catch (err) {
+        console.error("Failed to load company", err);
       }
-    });
+    }
+
+    loadCompany();
   }, []);
 
   /* ---------------- AUTO HIDE MESSAGE ---------------- */
@@ -99,9 +120,16 @@ export default function Profile() {
       }
 
       await saveCompany(updatedCompany);
-      setCompany(updatedCompany);
-      setLogo(null);
 
+      setCompany(updatedCompany);
+      setCompanyContext({
+        name: updatedCompany.name,
+        logo: updatedCompany.logo
+          ? `${import.meta.env.VITE_API_URL}${updatedCompany.logo}`
+          : "",
+      });
+
+      setLogo(null);
       setSaveMessage("Profile saved successfully ✅");
     } catch (err) {
       console.error(err);

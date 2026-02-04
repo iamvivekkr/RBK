@@ -1,9 +1,26 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-export function generateQuotationPDF(q) {
-  const doc = new jsPDF("p", "mm", "a4");
+/* ======================================================
+   INTERNAL BUILDER (SAFE FOR ALL QUOTATION SHAPES)
+====================================================== */
 
+function buildQuotationPDF(q) {
+  // 🔒 NORMALIZE DOCUMENT DATA (IMPORTANT FIX)
+  const documentData = q.document || {
+    prefix:
+      typeof q.quotationNo === "string" && q.quotationNo.includes("-")
+        ? q.quotationNo.split("-")[0]
+        : "EST",
+    number:
+      typeof q.quotationNo === "string" && q.quotationNo.includes("-")
+        ? q.quotationNo.split("-")[1]
+        : q.quotationNo || "000",
+    date: q.createdAt ? new Date(q.createdAt).toLocaleDateString("en-GB") : "",
+    dueDate: "",
+  };
+
+  const doc = new jsPDF("p", "mm", "a4");
   let y = 15;
 
   /* ---------- HEADER ---------- */
@@ -34,9 +51,9 @@ export function generateQuotationPDF(q) {
   /* ---------- META ---------- */
   y += 8;
   doc.setFont("helvetica", "bold");
-  doc.text(`Quotation #: ${q.document.prefix}-${q.document.number}`, 14, y);
-  doc.text(`Quotation Date: ${q.document.date}`, 80, y);
-  doc.text(`Validity: ${q.document.dueDate || q.document.date}`, 150, y);
+  doc.text(`Quotation #: ${documentData.prefix}-${documentData.number}`, 14, y);
+  doc.text(`Quotation Date: ${documentData.date}`, 80, y);
+  doc.text(`Validity: ${documentData.dueDate || documentData.date}`, 150, y);
 
   y += 8;
 
@@ -48,7 +65,7 @@ export function generateQuotationPDF(q) {
   y += 5;
   doc.setFont("helvetica", "normal");
   doc.text(q.customer?.name || "", 14, y);
-  doc.text(`${q.dispatchAddress?.addressLine1 || ""}`, 110, y);
+  doc.text(q.dispatchAddress?.addressLine1 || "", 110, y);
 
   y += 4;
   doc.text(`Ph: ${q.customer?.phone || ""}`, 14, y);
@@ -69,7 +86,7 @@ export function generateQuotationPDF(q) {
   y += 8;
 
   /* ---------- ITEMS TABLE ---------- */
-  const itemRows = q.products.map((p, i) => {
+  const itemRows = (q.products || []).map((p, i) => {
     const taxable = p.qty * p.price;
     const tax = ((taxable * (p.taxRate || 0)) / 100).toFixed(2);
 
@@ -105,9 +122,8 @@ export function generateQuotationPDF(q) {
 
   y = doc.lastAutoTable.finalY + 5;
 
-  /* ---------- TOTALS (RIGHT) ---------- */
+  /* ---------- TOTALS ---------- */
   const rightX = 130;
-
   const addTotal = (label, value, bold = false) => {
     doc.setFont("helvetica", bold ? "bold" : "normal");
     doc.text(label, rightX, y);
@@ -115,50 +131,29 @@ export function generateQuotationPDF(q) {
     y += 5;
   };
 
-  q.charges.forEach((c) => addTotal(c.label, `₹${c.amount.toFixed(2)}`));
+  (q.charges || []).forEach((c) =>
+    addTotal(c.label, `₹${c.amount.toFixed(2)}`),
+  );
 
-  addTotal("Taxable Amount", `₹${q.totals.subTotal.toFixed(2)}`);
-  addTotal("CGST 2.5%", "₹0.24");
-  addTotal("SGST 2.5%", "₹0.24");
-
-  if (q.extraDiscount > 0) {
-    addTotal("Discount", `-₹${q.extraDiscount.toFixed(2)}`);
-  }
-
-  addTotal("Round Off", "-0.25");
-  addTotal("Total", `₹${q.totals.grandTotal.toFixed(2)}`, true);
-
-  y += 10;
-
-  /* ---------- SIGNATURE ---------- */
-  doc.text("For Sandesh", 150, y);
-  y += 15;
-  doc.text("Authorized Signatory", 150, y);
-
-  y += 10;
-
-  /* ---------- NOTES ---------- */
-  if (q.notes) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Notes:", 14, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.text(q.notes, 14, y);
-  }
-
-  y += 10;
-
-  if (q.terms) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Terms and Conditions:", 14, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.text(q.terms, 14, y);
-  }
+  addTotal("Total", `₹${q.totalAmount || 0}`, true);
 
   /* ---------- FOOTER ---------- */
   doc.setFontSize(8);
   doc.text("This is a digitally signed document.", 14, 290);
 
-  doc.save(`Quotation-${q.document.prefix}-${q.document.number}.pdf`);
+  return { doc, documentData };
+}
+
+/* ======================================================
+   PUBLIC EXPORTS
+====================================================== */
+
+export function generateQuotationPDF(q) {
+  const { doc, documentData } = buildQuotationPDF(q);
+  doc.save(`Quotation-${documentData.prefix}-${documentData.number}.pdf`);
+}
+
+export function generateQuotationPDFBlob(q) {
+  const { doc } = buildQuotationPDF(q);
+  return doc.output("blob");
 }

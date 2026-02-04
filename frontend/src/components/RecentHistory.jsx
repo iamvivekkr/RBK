@@ -1,7 +1,31 @@
 import { useEffect, useState } from "react";
 import { Printer, Share2 } from "lucide-react";
 import API from "../services/api";
-import { generateQuotationPDF } from "../pages/quotation/pdfGenerator";
+import {
+  generateQuotationPDF,
+  generateQuotationPDFBlob,
+} from "../pages/quotation/pdfGenerator";
+
+/* ---------------- DATE FORMATTER ---------------- */
+
+function formatDateTime(dateString) {
+  if (!dateString) {
+    return { date: "--/--/----", time: "--:--" };
+  }
+
+  const d = new Date(dateString);
+
+  const date = d.toLocaleDateString("en-GB"); // DD/MM/YYYY
+  const time = d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return { date, time };
+}
+
+/* ---------------- COMPONENT ---------------- */
 
 export default function RecentHistory() {
   const [quotations, setQuotations] = useState([]);
@@ -21,6 +45,7 @@ export default function RecentHistory() {
 
   return (
     <div style={{ margin: "16px" }}>
+      {/* HEADER */}
       <div style={styles.header}>
         <h4>Recent History</h4>
         <button style={styles.btn}>View All</button>
@@ -30,45 +55,111 @@ export default function RecentHistory() {
         <div style={{ opacity: 0.6 }}>No quotations yet</div>
       )}
 
-      {quotations.map((q) => (
-        <div key={q._id} style={styles.card}>
-          <small style={{ color: "#3ddc97" }}>NO.: #{q.quotationNo}</small>
+      {quotations.map((q) => {
+        const { date, time } = formatDateTime(q.createdAt);
 
-          <h5>{q.customer?.name || "—"}</h5>
+        return (
+          <div key={q._id} style={styles.card}>
+            {/* DATE & TIME */}
+            <div style={styles.datetime}>
+              <div>{date}</div>
+              <div>{time}</div>
+            </div>
 
-          <p>Quotation: ₹ {q.totalAmount || 0}</p>
+            <small style={{ color: "#3ddc97" }}>NO.: #{q.quotationNo}</small>
 
-          <div style={styles.icons}>
-            <Printer
-              size={16}
-              style={{ cursor: "pointer" }}
-              onClick={() => generateQuotationPDF(q)}
-            />
-            <Share2
-              size={16}
-              style={{ cursor: "pointer" }}
-              onClick={() => shareQuotation(q)}
-            />
+            <h5 style={{ margin: "6px 0" }}>{q.customer?.name || "—"}</h5>
+
+            <p style={{ margin: 0 }}>Quotation: ₹ {q.totalAmount || 0}</p>
+
+            <div style={styles.icons}>
+              <Printer
+                size={16}
+                style={{ cursor: "pointer" }}
+                onClick={() => generateQuotationPDF(q)}
+              />
+              <Share2
+                size={16}
+                style={{ cursor: "pointer" }}
+                onClick={() => shareQuotation(q)}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-/* ---------------- SHARE ---------------- */
+/* ---------------- SHARE LOGIC ---------------- */
 
-function shareQuotation(q) {
+async function shareQuotation(q) {
   const text = `Quotation ${q.quotationNo}
 Customer: ${q.customer?.name}
 Amount: ₹ ${q.totalAmount}`;
 
-  if (navigator.share) {
-    navigator.share({ text });
-  } else {
-    navigator.clipboard.writeText(text);
-    alert("Quotation details copied");
+  const pdfBlob = generateQuotationPDFBlob(q);
+  const pdfUrl = URL.createObjectURL(pdfBlob);
+
+  // 📱 MOBILE: native share with PDF
+  if (
+    navigator.share &&
+    navigator.canShare &&
+    navigator.canShare({
+      files: [
+        new File([pdfBlob], "quotation.pdf", {
+          type: "application/pdf",
+        }),
+      ],
+    })
+  ) {
+    await navigator.share({
+      title: `Quotation ${q.quotationNo}`,
+      text,
+      files: [
+        new File([pdfBlob], "quotation.pdf", {
+          type: "application/pdf",
+        }),
+      ],
+    });
+    return;
   }
+
+  // 💻 DESKTOP OPTIONS
+  const links = desktopShare(q, pdfUrl);
+
+  const choice = window.prompt(
+    "Share quotation:\n1 = WhatsApp\n2 = Email\n3 = Download PDF",
+  );
+
+  if (choice === "1") {
+    window.open(links.whatsapp, "_blank");
+  } else if (choice === "2") {
+    window.location.href = links.mail;
+  } else {
+    const a = document.createElement("a");
+    a.href = pdfUrl;
+    a.download = `Quotation-${q.quotationNo}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+}
+
+/* ---------------- DESKTOP SHARE LINKS ---------------- */
+
+function desktopShare(q, pdfUrl) {
+  const text = `Quotation ${q.quotationNo}
+Customer: ${q.customer?.name}
+Amount: ₹ ${q.totalAmount}`;
+
+  const encodedText = encodeURIComponent(text);
+  const encodedUrl = encodeURIComponent(pdfUrl);
+
+  return {
+    whatsapp: `https://wa.me/?text=${encodedText}%0A%0A${encodedUrl}`,
+    mail: `mailto:?subject=Quotation ${q.quotationNo}&body=${encodedText}%0A%0A${encodedUrl}`,
+  };
 }
 
 /* ---------------- STYLES ---------------- */
@@ -86,6 +177,7 @@ const styles = {
     padding: "6px 12px",
     borderRadius: "20px",
     cursor: "pointer",
+    fontSize: "12px",
   },
   card: {
     background: "#1b1b1b",
@@ -94,11 +186,22 @@ const styles = {
     marginBottom: "10px",
     position: "relative",
   },
+  datetime: {
+    position: "absolute",
+    top: "14px",
+    right: "14px",
+    textAlign: "right",
+    fontSize: "12px",
+    opacity: 0.7,
+    lineHeight: "16px",
+    pointerEvents: "none", // 👈 prevents click blocking
+  },
   icons: {
     position: "absolute",
     right: "14px",
     bottom: "14px",
     display: "flex",
     gap: "10px",
+    zIndex: 5, // 👈 ensures clickable
   },
 };

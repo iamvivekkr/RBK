@@ -42,5 +42,10 @@ const styles = {
     textAlign: "center",
     fontSize: "13px",
     cursor: "pointer",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
   },
 };

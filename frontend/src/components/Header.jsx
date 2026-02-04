@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useCompany } from "../context/CompanyContext";
 
 export default function Header() {
   const [open, setOpen] = useState(false);
@@ -14,11 +15,15 @@ export default function Header() {
     { label: "Signature", path: "/signature" },
     { label: "Dispatch Address", path: "/dispatch-addresses" },
   ];
+  const { company } = useCompany();
 
   return (
     <header style={styles.header}>
       <div style={styles.company} onClick={() => setOpen(!open)}>
-        <span>RBK Company</span>
+        {company.logo && (
+          <img src={company.logo} alt="Company Logo" style={styles.logo} />
+        )}
+        <span>{company.name}</span>
         <ChevronDown size={18} />
       </div>
 
@@ -82,5 +87,12 @@ const styles = {
   divider: {
     height: "1px",
     background: "#333",
+  },
+  logo: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "6px",
+    objectFit: "cover",
+    background: "#fff",
   },
 };
