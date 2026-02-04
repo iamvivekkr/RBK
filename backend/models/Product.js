@@ -13,7 +13,8 @@ const productSchema = new mongoose.Schema(
 
     taxRate: {
       type: Number,
-      enum: [0, 5, 12, 18, 28],
+      min: 0,
+      max: 100,
       default: 0,
     },
 

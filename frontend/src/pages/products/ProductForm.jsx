@@ -3,6 +3,54 @@ import { useEffect, useState } from "react";
 import API from "../../services/api";
 
 const BASE_TAX_RATES = [0, 5, 12, 18, 28];
+const UNIT_OPTIONS = [
+  // Count
+  "PCS",
+  "NOS",
+  "UNIT",
+  "SET",
+  "PAIR",
+  "BOX",
+  "PACK",
+  "DOZEN",
+
+  // Weight
+  "KG",
+  "GM",
+  "MG",
+  "TON",
+
+  // Volume
+  "LTR",
+  "ML",
+  "KL",
+
+  // Length
+  "MTR",
+  "CM",
+  "MM",
+  "INCH",
+  "FT",
+
+  // Area
+  "SQFT",
+  "SQM",
+  "SQCM",
+
+  // Time / Service
+  "HOUR",
+  "DAY",
+  "MONTH",
+  "YEAR",
+
+  // Others
+  "BUNDLE",
+  "ROLL",
+  "BAG",
+  "CAN",
+  "BOTTLE",
+  "SERVICE",
+];
 
 export default function ProductForm({ product, onBack }) {
   const [form, setForm] = useState({
@@ -17,7 +65,20 @@ export default function ProductForm({ product, onBack }) {
   });
 
   useEffect(() => {
-    if (product) setForm(product);
+    if (product) {
+      setForm(product);
+
+      if (
+        typeof product.taxRate === "number" &&
+        !BASE_TAX_RATES.includes(product.taxRate)
+      ) {
+        setTaxOptions(
+          [...BASE_TAX_RATES, product.taxRate].sort((a, b) => a - b),
+        );
+      } else {
+        setTaxOptions(BASE_TAX_RATES);
+      }
+    }
   }, [product]);
 
   const submit = async () => {
@@ -56,7 +117,7 @@ export default function ProductForm({ product, onBack }) {
         {priceRow("Purchase Price", "purchasePrice", "purchaseTaxType")}
 
         {input("HSN Code", "hsn")}
-        {input("Unit", "unit")}
+        {unitSelect("Unit", "unit")}
       </div>
 
       <button style={styles.submitBtn} onClick={submit}>
@@ -74,6 +135,25 @@ export default function ProductForm({ product, onBack }) {
           value={form[key]}
           onChange={(e) => setForm({ ...form, [key]: e.target.value })}
         />
+      </>
+    );
+  }
+
+  function unitSelect(label, key) {
+    return (
+      <>
+        <label style={styles.label}>{label}</label>
+        <select
+          style={styles.input}
+          value={form[key]}
+          onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+        >
+          {UNIT_OPTIONS.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </select>
       </>
     );
   }
