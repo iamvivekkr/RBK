@@ -10,15 +10,15 @@ const addressSchema = new mongoose.Schema({
 
 const customerSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    phone: { type: String, required: true },
+    name: { type: String },
+    phone: { type: String },
     email: String,
     companyName: String, // optional
     gst: String, // optional
     billingAddress: addressSchema,
     shippingAddress: addressSchema,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Customer", customerSchema);

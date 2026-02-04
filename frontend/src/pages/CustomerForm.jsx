@@ -33,7 +33,7 @@ export default function CustomerForm({ customer, onBack }) {
     setAddress(
       type === "Billing"
         ? form.billingAddress || {}
-        : form.shippingAddress || {}
+        : form.shippingAddress || {},
     );
     setShowModal(true);
   };
@@ -48,11 +48,6 @@ export default function CustomerForm({ customer, onBack }) {
   };
 
   const submit = async () => {
-    if (!form.name || !form.phone || !form.email) {
-      alert("Name, Phone, Email are required");
-      return;
-    }
-
     if (customer?._id) {
       await API.put(`/customers/${customer._id}`, form);
     } else {
@@ -88,12 +83,12 @@ export default function CustomerForm({ customer, onBack }) {
         />
 
         <Input
-          label="Company Name (Optional)"
+          label="Company Name"
           value={form.companyName}
           onChange={(e) => setForm({ ...form, companyName: e.target.value })}
         />
         <Input
-          label="GST Number (Optional)"
+          label="GST Number"
           value={form.gst}
           onChange={(e) => setForm({ ...form, gst: e.target.value })}
         />

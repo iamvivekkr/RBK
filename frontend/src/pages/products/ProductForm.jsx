@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import API from "../../services/api";
 
-const TAX_RATES = [0, 5, 12, 18, 28];
+const BASE_TAX_RATES = [0, 5, 12, 18, 28];
 
 export default function ProductForm({ product, onBack }) {
   const [form, setForm] = useState({
@@ -21,8 +21,8 @@ export default function ProductForm({ product, onBack }) {
   }, [product]);
 
   const submit = async () => {
-    if (!form.name || !form.sellingPrice) {
-      alert("Product name and selling price required");
+    if (form.taxRate < 0 || form.taxRate > 100) {
+      alert("Tax rate must be between 0 and 100%");
       return;
     }
 
@@ -34,6 +34,10 @@ export default function ProductForm({ product, onBack }) {
 
     onBack();
   };
+
+  const [taxOptions, setTaxOptions] = useState(BASE_TAX_RATES);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customTax, setCustomTax] = useState("");
 
   return (
     <div style={styles.page}>
@@ -47,7 +51,7 @@ export default function ProductForm({ product, onBack }) {
 
         {priceRow("Selling price", "sellingPrice", "sellingTaxType")}
 
-        {select("Tax rate %", "taxRate", TAX_RATES)}
+        {select("Tax rate %", "taxRate")}
 
         {priceRow("Purchase Price", "purchasePrice", "purchaseTaxType")}
 
@@ -74,23 +78,66 @@ export default function ProductForm({ product, onBack }) {
     );
   }
 
-  function select(label, key, options) {
+  function select(label, key) {
     return (
       <>
         <label style={styles.label}>{label}</label>
+
         <select
           style={styles.input}
           value={form[key]}
-          onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })}
+          onChange={(e) => {
+            if (e.target.value === "custom") {
+              setShowCustomInput(true);
+              setCustomTax("");
+            } else {
+              setForm({ ...form, [key]: Number(e.target.value) });
+            }
+          }}
         >
-          {options.map((o) => (
+          {taxOptions.map((o) => (
             <option key={o} value={o}>
               {o}%
             </option>
           ))}
+
+          <option value="custom">Custom %</option>
         </select>
+
+        {showCustomInput && (
+          <input
+            autoFocus
+            type="number"
+            min={0}
+            max={100}
+            placeholder="Enter tax %"
+            style={{ ...styles.input, marginTop: 8 }}
+            value={customTax}
+            onChange={(e) => setCustomTax(e.target.value)}
+            onBlur={applyCustomTax}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") applyCustomTax();
+            }}
+          />
+        )}
       </>
     );
+
+    function applyCustomTax() {
+      const val = Number(customTax);
+      if (isNaN(val) || val < 0 || val > 100) {
+        setShowCustomInput(false);
+        return;
+      }
+
+      // add temporarily if not exists
+      if (!taxOptions.includes(val)) {
+        setTaxOptions([...taxOptions, val].sort((a, b) => a - b));
+      }
+
+      setForm({ ...form, [key]: val });
+      setShowCustomInput(false);
+    }
   }
 
   function priceRow(label, priceKey, typeKey) {

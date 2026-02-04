@@ -76,8 +76,9 @@ export default function RecentHistory() {
               <Printer
                 size={16}
                 style={{ cursor: "pointer" }}
-                onClick={() => generateQuotationPDF(q)}
+                onClick={() => printQuotation(q)}
               />
+
               <Share2
                 size={16}
                 style={{ cursor: "pointer" }}
@@ -95,8 +96,8 @@ export default function RecentHistory() {
 
 async function shareQuotation(q) {
   const text = `Quotation ${q.quotationNo}
-Customer: ${q.customer?.name}
-Amount: ₹ ${q.totalAmount}`;
+  Customer: ${q.customer?.name}
+  Amount: ₹ ${q.totalAmount}`;
 
   const pdfBlob = generateQuotationPDFBlob(q);
   const pdfUrl = URL.createObjectURL(pdfBlob);
@@ -150,8 +151,8 @@ Amount: ₹ ${q.totalAmount}`;
 
 function desktopShare(q, pdfUrl) {
   const text = `Quotation ${q.quotationNo}
-Customer: ${q.customer?.name}
-Amount: ₹ ${q.totalAmount}`;
+  Customer: ${q.customer?.name}
+  Amount: ₹ ${q.totalAmount}`;
 
   const encodedText = encodeURIComponent(text);
   const encodedUrl = encodeURIComponent(pdfUrl);
@@ -159,6 +160,22 @@ Amount: ₹ ${q.totalAmount}`;
   return {
     whatsapp: `https://wa.me/?text=${encodedText}%0A%0A${encodedUrl}`,
     mail: `mailto:?subject=Quotation ${q.quotationNo}&body=${encodedText}%0A%0A${encodedUrl}`,
+  };
+}
+
+function printQuotation(q) {
+  const pdfBlob = generateQuotationPDFBlob(q);
+  const pdfUrl = URL.createObjectURL(pdfBlob);
+
+  const iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = pdfUrl;
+
+  document.body.appendChild(iframe);
+
+  iframe.onload = () => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
   };
 }
 

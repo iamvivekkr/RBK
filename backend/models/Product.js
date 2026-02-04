@@ -4,7 +4,7 @@ const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
 
-    sellingPrice: { type: Number, required: true },
+    sellingPrice: { type: Number },
     sellingTaxType: {
       type: String,
       enum: ["with", "without"],
@@ -27,7 +27,7 @@ const productSchema = new mongoose.Schema(
     hsn: { type: String },
     unit: { type: String, default: "PCS" },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Product", productSchema);
