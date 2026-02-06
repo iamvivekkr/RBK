@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Printer, Share2 } from "lucide-react";
 import API from "../services/api";
+import { useNavigate } from "react-router-dom";
+
 import {
   generateQuotationPDF,
   generateQuotationPDFBlob,
@@ -43,12 +45,16 @@ export default function RecentHistory() {
     }
   };
 
+  const navigate = useNavigate();
+
   return (
     <div style={{ margin: "16px" }}>
       {/* HEADER */}
       <div style={styles.header}>
         <h4>Recent History</h4>
-        <button style={styles.btn}>View All</button>
+        <button style={styles.btn} onClick={() => navigate("/quotations")}>
+          View All
+        </button>
       </div>
 
       {quotations.length === 0 && (
@@ -59,7 +65,11 @@ export default function RecentHistory() {
         const { date, time } = formatDateTime(q.createdAt);
 
         return (
-          <div key={q._id} style={styles.card}>
+          <div
+            key={q._id}
+            style={{ ...styles.card, cursor: "pointer" }}
+            onClick={() => navigate(`/quotations/view/${q._id}`)}
+          >
             {/* DATE & TIME */}
             <div style={styles.datetime}>
               <div>{date}</div>
@@ -72,7 +82,7 @@ export default function RecentHistory() {
 
             <p style={{ margin: 0 }}>Quotation: ₹ {q.totalAmount || 0}</p>
 
-            <div style={styles.icons}>
+            <div style={styles.icons} onClick={(e) => e.stopPropagation()}>
               <Printer
                 size={16}
                 style={{ cursor: "pointer" }}

@@ -45,17 +45,40 @@ exports.createQuotation = async (req, res) => {
   }
 };
 
-// GET ALL
+// GET ALL (recent OR paginated)
 exports.getQuotations = async (req, res) => {
   try {
     const limit = Number(req.query.limit) || 20;
+    const page = Number(req.query.page);
 
-    const quotations = await Quotation.find()
-      .populate("customer", "name phone")
-      .sort({ createdAt: -1 })
-      .limit(limit);
+    // 🔹 CASE 1: RECENT HISTORY (no page param)
+    if (!page) {
+      const quotations = await Quotation.find()
+        .populate("customer", "name phone")
+        .sort({ createdAt: -1 })
+        .limit(limit);
 
-    res.json(quotations);
+      return res.json(quotations); // ✅ SAME AS BEFORE
+    }
+
+    // 🔹 CASE 2: PAGINATED LIST (View All)
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      Quotation.find()
+        .populate("customer", "name phone")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Quotation.countDocuments(),
+    ]);
+
+    return res.json({
+      data,
+      page,
+      totalPages: Math.ceil(total / limit),
+      total,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
